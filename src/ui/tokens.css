@@ -1,0 +1,55 @@
+/* Glimpse design tokens: shared by every window. See DESIGN.md. */
+@font-face { font-family: "Barlow"; font-weight: 400; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Readout"; font-weight: 500; src: url("fonts/barlow-semi-condensed-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Readout"; font-weight: 600; src: url("fonts/barlow-semi-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Readout"; font-weight: 700; src: url("fonts/barlow-semi-condensed-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  --body: #1c2027;
+  --body-2: #262b34;
+  --body-3: #2f3540;
+  --edge: #343a45;
+  --edge-soft: rgba(236, 238, 242, 0.07);
+  --paper: #eceef2;
+  --fog: #8c93a1;
+  --fog-2: #636a78;
+  --focus: #ffd23f;
+  --focus-ink: #241d00;
+  --tally: #ff4b3e;
+  --well: #14171c;
+
+  --r-panel: 14px;
+  --r-btn: 9px;
+  --r-chip: 4px;
+
+  --ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --readout: "Barlow Readout", "Barlow", "Segoe UI", sans-serif;
+
+  --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -12px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.35);
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: border-box; }
+
+.readout {
+  font-family: var(--readout);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.key {
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px;
+  font: 600 12px/1 var(--readout); color: var(--paper);
+  background: var(--body-3); border-radius: var(--r-chip);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

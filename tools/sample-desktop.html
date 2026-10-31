@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- A neutral "desktop" used as the screen behind Glimpse in README screenshots (no personal content). -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; font-family: "Segoe UI", Inter, sans-serif; }
+  body { background: #2b3440; }
+  .win { position: absolute; left: 120px; top: 54px; width: 1680px; height: 972px; border-radius: 14px; overflow: hidden; background: #fff;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,.6); }
+  .bar { height: 64px; background: #f1f3f6; border-bottom: 1px solid #e3e6eb; position: relative; }
+  .bar i { position: absolute; top: 25px; width: 14px; height: 14px; border-radius: 50%; background: #d5d9df; }
+  .bar i:nth-child(1) { left: 22px; } .bar i:nth-child(2) { left: 46px; } .bar i:nth-child(3) { left: 70px; }
+  .url { position: absolute; left: 110px; right: 520px; top: 14px; height: 36px; border-radius: 9px; background: #fff; font-size: 17px; line-height: 36px; padding-left: 16px; color: #5b6470; }
+  .page { display: grid; grid-template-columns: 1fr 470px; gap: 56px; padding: 44px 64px; }
+  h1 { margin: 0 0 6px; font-size: 54px; font-weight: 800; letter-spacing: -0.025em; color: #15181d; }
+  .by { margin: 0 0 26px; font-size: 20px; color: #5b6470; }
+  .hero { position: relative; width: 100%; aspect-ratio: 952 / 460; border-radius: 20px; overflow: hidden; }
+  .hero svg.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .plane { position: absolute; left: 47%; top: 26%; width: 9%; height: auto; transform: rotate(-10deg); }
+  p.body { font-size: 21px; line-height: 1.6; color: #3a414b; margin: 26px 0 0; }
+  .card { background: #f4f5f7; border-radius: 18px; padding: 8px 26px; }
+  .row { display: flex; justify-content: space-between; height: 58px; align-items: center; font-size: 21px; }
+  .row + .row { border-top: 1px solid #e6e8ec; }
+  .row span { color: #5b6470; } .row b { color: #15181d; }
+  h2 { font-size: 24px; margin: 30px 0 14px; color: #15181d; }
+  .day { display: flex; gap: 16px; margin-bottom: 16px; font-size: 19px; color: #3a414b; line-height: 1.45; }
+  .day b { flex: none; width: 54px; height: 54px; border-radius: 14px; background: #e7f2f1; color: #1f6f6e; display: grid; place-items: center; font-size: 18px; }
+</style>
+</head>
+<body>
+  <div class="win">
+    <div class="bar"><i></i><i></i><i></i><div class="url">fjordnotes.example/six-days</div></div>
+    <div class="page">
+      <div>
+        <h1>Six days in the fjords</h1>
+        <p class="by">Photos and notes by Ana Ruiz, 8 min read</p>
+        <div class="hero">
+          <svg class="bg" viewBox="0 0 952 460" preserveAspectRatio="none">
+            <rect width="952" height="460" fill="#fde3c4"/>
+            <circle cx="690" cy="168" r="74" fill="#f2994a"/>
+            <polygon points="0,300 120,176 236,262 362,118 476,238 596,146 722,268 834,186 952,256 952,460 0,460" fill="#a7c9c3"/>
+            <polygon points="0,344 152,232 302,334 424,248 562,342 704,258 862,352 952,300 952,460 0,460" fill="#4e9a95"/>
+            <polygon points="0,386 196,300 334,388 520,330 700,392 952,350 952,460 0,460" fill="#1f6f6e"/>
+            <rect y="396" width="952" height="64" fill="#2e8b8b"/>
+            <rect x="80" y="414" width="160" height="5" rx="2.5" fill="#7cc4c0"/>
+            <rect x="420" y="430" width="220" height="5" rx="2.5" fill="#7cc4c0"/>
+            <rect x="730" y="412" width="120" height="5" rx="2.5" fill="#7cc4c0"/>
+          </svg>
+          <svg class="plane" viewBox="0 0 120 80"><polygon points="4,40 116,6 60,74" fill="#fff"/><polygon points="116,6 60,74 52,48" fill="#dfe6ec"/><polygon points="116,6 52,48 40,62" fill="#c5d0d8"/></svg>
+        </div>
+        <p class="body">We took the slow ferry north and stopped wherever the water looked calm enough to swim. Day three was the one everyone asks about: a paper plane, a tailwind, and the longest glide any of us had seen.</p>
+      </div>
+      <div>
+        <div class="card">
+          <div class="row"><span>Dates</span><b>June 12 to 18</b></div>
+          <div class="row"><span>Booking code</span><b>KJ-4471-PX</b></div>
+          <div class="row"><span>Route</span><b>Bergen to Ålesund</b></div>
+          <div class="row"><span>Ferry</span><b>Hurtigruten, deck 6</b></div>
+        </div>
+        <h2>The days</h2>
+        <div class="day"><b>Day 1</b><span>Bergen fish market at seven, then the funicular before the crowds.</span></div>
+        <div class="day"><b>Day 2</b><span>Ferry to Balestrand. Cold swim, warm cinnamon buns.</span></div>
+        <div class="day"><b>Day 3</b><span>The glide. Someone filmed it. Nobody believes it.</span></div>
+        <div class="day"><b>Day 4</b><span>Rain all morning, rainbow all afternoon.</span></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

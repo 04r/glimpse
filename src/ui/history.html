@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; media-src 'self' file:">
+  <title>Captures</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+    header { display: flex; align-items: center; gap: 14px; padding: 18px 26px; border-bottom: 1px solid var(--edge); }
+    header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+    header .count { color: var(--fog); font: 600 15px var(--readout); font-variant-numeric: tabular-nums; margin-top: 3px; }
+    .grow { flex: 1; }
+    main { overflow: auto; background: var(--well); padding: 6px 26px 40px; }
+
+    .day { margin-top: 22px; }
+    .day h2 { display: flex; align-items: baseline; gap: 10px; font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+    .day h2 span { color: var(--fog-2); font: 500 14px var(--readout); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px 16px; }
+
+    .shot { display: grid; gap: 9px; min-width: 0; }
+    .frame {
+      position: relative; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; cursor: zoom-in;
+      background: repeating-conic-gradient(#1d2128 0 25%, #191c22 0 50%) 0 0 / 16px 16px;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+    }
+    .frame img, .frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+    .frame:hover { box-shadow: 0 0 0 2px var(--focus); }
+    .chip {
+      position: absolute; top: 8px; height: 22px; padding: 0 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;
+      font: 700 12.5px var(--readout); background: rgba(20, 23, 28, 0.86); color: var(--paper);
+    }
+    .chip.kind { left: 8px; }
+    .chip.kind.gif { background: var(--focus); color: var(--focus-ink); }
+    .chip.link { right: 8px; cursor: pointer; }
+    .chip.link svg { width: 13px; height: 13px; }
+    .chip.link:hover { background: var(--paper); color: var(--body); }
+    .missing { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fog); font-size: 13.5px; }
+
+    .acts {
+      position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; gap: 2px; padding: 3px; border-radius: 9px;
+      background: rgba(28, 32, 39, 0.94); border: 1px solid var(--edge); visibility: hidden;
+    }
+    .frame:hover .acts, .frame:focus-within .acts { visibility: visible; }
+    .acts button {
+      flex: 1; height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--paper); cursor: pointer;
+      display: grid; place-items: center;
+    }
+    .acts button:hover { background: var(--body-3); }
+    .acts button.del:hover { color: var(--tally); }
+    .acts svg { width: 17px; height: 17px; }
+
+    .meta { display: flex; align-items: baseline; gap: 10px; padding: 0 2px; min-width: 0; }
+    .meta .time { font: 700 16px var(--readout); font-variant-numeric: tabular-nums; }
+    .meta .dims, .meta .size { color: var(--fog); font: 500 13.5px var(--readout); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .meta .saved { margin-left: auto; color: var(--fog-2); font-size: 12.5px; }
+
+    .empty { max-width: 420px; margin: 16vh auto 0; text-align: center; color: var(--fog); line-height: 1.6; }
+    .empty h2 { color: var(--paper); font-size: 20px; margin-bottom: 8px; }
+    .empty .key { margin: 0 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Captures</h1>
+    <span class="count" id="count"></span>
+    <span class="grow"></span>
+    <div class="seg" id="filters">
+      <button data-f="all" class="on">All</button><button data-f="image">Screenshots</button><button data-f="gif">GIFs</button><button data-f="video">Videos</button>
+    </div>
+    <button class="btn" id="folder"></button>
+    <button class="btn quiet danger" id="clear">Clear</button>
+  </header>
+  <main id="main"></main>
+  <script src="icons.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

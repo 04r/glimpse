@@ -1,0 +1,6 @@
+node_modules/
+# local design snapshots (taken from the real desktop, may contain personal content)
+design-review/
+*.log
+out/
+dist/

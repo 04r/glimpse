@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream:">
+  <title>Recording</title>
+  <link rel="stylesheet" href="tokens.css">
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; font-family: var(--ui); color: var(--paper); }
+    .bar {
+      position: absolute; inset: 6px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 14px;
+      border-radius: var(--r-panel); background: rgba(28, 32, 39, 0.97); border: 1px solid var(--edge);
+      box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.7); -webkit-app-region: drag;
+    }
+    .clock { display: flex; flex-direction: column; gap: 6px; width: 190px; }
+    .clock .top { display: flex; align-items: baseline; gap: 9px; }
+    .tally { width: 10px; height: 10px; border-radius: 50%; background: var(--tally); align-self: center; flex: none; box-shadow: 0 0 0 3px rgba(255, 75, 62, 0.2); }
+    .paused .tally { background: var(--fog); box-shadow: none; }
+    .time { font: 700 21px/1 var(--readout); font-variant-numeric: tabular-nums; }
+    .of { font: 500 13px/1 var(--readout); color: var(--fog); font-variant-numeric: tabular-nums; }
+    .of b { color: var(--paper); font-weight: 600; margin-right: 6px; }
+    .track { display: block; margin-left: 19px; height: 2px; border-radius: 1px; background: var(--body-3); overflow: hidden; }
+    .track i { display: block; height: 100%; width: 0; background: var(--tally); }
+    .paused .track i { background: var(--fog); }
+    .grow { flex: 1; }
+    button {
+      -webkit-app-region: no-drag; border: 0; height: 36px; min-width: 36px; border-radius: var(--r-btn); cursor: pointer;
+      background: transparent; color: var(--paper); display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      font: 600 14px var(--ui); padding: 0 9px; transition: background-color 0.08s, transform 0.08s;
+    }
+    button:hover { background: var(--body-3); }
+    button:active { transform: scale(0.94); }
+    button svg { width: 18px; height: 18px; }
+    .stop { background: var(--tally); color: #fff; padding: 0 13px 0 11px; }
+    .stop:hover { background: #ff6357; }
+    .saving button { opacity: 0.35; pointer-events: none; }
+    .saving .time { font-size: 15px; font-family: var(--ui); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="bar" id="bar">
+    <div class="clock">
+      <div class="top">
+        <span class="tally"></span>
+        <span class="time" id="time">0:00.0</span>
+        <span class="of" id="of"></span>
+      </div>
+      <span class="track"><i id="prog"></i></span>
+    </div>
+    <span class="grow"></span>
+    <button class="pause" id="pause" title="Pause"></button>
+    <button class="stop" id="stop" title="Stop and edit (or press the hotkey again)"><span id="stopIcon"></span>Stop</button>
+    <button id="cancel" title="Discard recording (Esc)"></button>
+  </div>
+  <script src="icons.js"></script>
+  <script src="recbar.js"></script>
+</body>
+</html>

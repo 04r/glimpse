@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- README / social banner, rendered to docs/banner.png by `electron . --docs`. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../src/ui/tokens.css">
+<style>
+  html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; background: #1c2027; font-family: "Barlow", sans-serif; color: #eceef2; }
+  .left { position: absolute; left: 76px; top: 0; bottom: 0; width: 520px; display: flex; flex-direction: column; justify-content: center; }
+  .mark { position: relative; width: 92px; height: 92px; margin-bottom: 30px; }
+  .mark i { position: absolute; width: 28px; height: 28px; border: 0 solid #ffd23f; }
+  .mark .a { left: 0; top: 0; border-left-width: 7px; border-top-width: 7px; }
+  .mark .b { right: 0; top: 0; border-right-width: 7px; border-top-width: 7px; }
+  .mark .c { left: 0; bottom: 0; border-left-width: 7px; border-bottom-width: 7px; }
+  .mark .d { right: 0; bottom: 0; border-right-width: 7px; border-bottom-width: 7px; }
+  .mark .dot { left: 38px; top: 38px; width: 16px; height: 16px; border-radius: 50%; background: #ffd23f; border: 0; }
+  h1 { margin: 0; font-size: 112px; font-weight: 700; letter-spacing: -0.02em; line-height: 0.95; }
+  p { margin: 18px 0 30px; font-size: 32px; font-weight: 500; color: #8c93a1; line-height: 1.3; }
+  .keys { display: flex; align-items: center; gap: 12px; font-size: 22px; color: #8c93a1; }
+  .k { display: inline-grid; place-items: center; height: 42px; padding: 0 14px; border-radius: 7px; background: #2f3540; color: #eceef2;
+    font: 700 22px "Barlow Readout", sans-serif; box-shadow: inset 0 -3px 0 rgba(0,0,0,.35); }
+  .shot { position: absolute; left: 590px; top: 70px; width: 820px; height: 500px; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 40px 90px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.06); }
+  .shot img { position: absolute; left: -70px; top: -118px; width: 1100px; }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="mark"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="dot"></i></div>
+    <h1>Glimpse</h1>
+    <p>Screenshots and GIFs,<br>one key away.</p>
+    <div class="keys"><span class="k">PrtSc</span> capture <span style="width:14px"></span><span class="k">Ctrl</span><span class="k">PrtSc</span> GIF</div>
+  </div>
+  <div class="shot"><img src="../docs/screenshot-overlay.png"></div>
+</body>
+</html>

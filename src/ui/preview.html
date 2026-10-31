@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file: blob:; img-src 'self' data: blob:">
+  <title>Glimpse — Edit recording</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body { display: grid; grid-template-rows: 1fr auto auto; height: 100vh; user-select: none; }
+
+    /* player */
+    .stage { position: relative; min-height: 0; background: var(--well); display: grid; place-items: center; padding: 22px; }
+    .stage video {
+      max-width: 100%; max-height: 100%; display: block; border-radius: 4px;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 24px 60px -20px rgba(0, 0, 0, 0.8);
+      background: repeating-conic-gradient(#20242c 0 25%, #1a1d24 0 50%) 0 0 / 20px 20px;
+    }
+    .badge {
+      position: absolute; left: 22px; top: 18px; height: 26px; padding: 0 10px; border-radius: 4px;
+      display: flex; align-items: center; gap: 8px; background: rgba(20, 23, 28, 0.85); font: 600 13.5px var(--readout);
+      font-variant-numeric: tabular-nums; color: var(--fog);
+    }
+    .badge b { color: var(--paper); font-weight: 600; }
+
+    /* timeline */
+    .timeline { padding: 16px 22px 14px; border-top: 1px solid var(--edge); display: grid; gap: 10px; }
+    .transport { display: flex; align-items: center; gap: 12px; }
+    .play {
+      width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+      background: var(--paper); color: var(--body); transition: transform 0.08s;
+    }
+    .play:active { transform: scale(0.92); }
+    .play svg { width: 17px; height: 17px; }
+    .tc { font: 700 20px/1 var(--readout); font-variant-numeric: tabular-nums; }
+    .tc span { color: var(--fog); font-weight: 500; font-size: 15px; margin-left: 6px; }
+    .grow { flex: 1; }
+    .clipinfo { display: flex; gap: 18px; color: var(--fog); font-size: 13.5px; }
+    .clipinfo b { color: var(--paper); font: 600 15px var(--readout); font-variant-numeric: tabular-nums; margin-left: 6px; }
+
+    .strip { position: relative; height: 66px; border-radius: 8px; overflow: hidden; background: var(--well); cursor: pointer; touch-action: none; }
+    .strip canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .strip .dim { position: absolute; top: 0; bottom: 0; background: rgba(20, 23, 28, 0.72); pointer-events: none; }
+    .strip .win {
+      position: absolute; top: 0; bottom: 0; border: 3px solid var(--focus); border-left-width: 14px; border-right-width: 14px;
+      border-radius: 8px; pointer-events: none;
+    }
+    .strip .grip { position: absolute; top: 0; bottom: 0; width: 22px; margin-left: -11px; cursor: ew-resize; z-index: 2; }
+    .strip .grip::after {
+      content: ""; position: absolute; left: 50%; top: 50%; width: 2px; height: 20px; margin: -10px 0 0 -1px;
+      border-radius: 1px; background: var(--focus-ink); opacity: 0.6;
+    }
+    .strip .head { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: #fff; border-radius: 1px; pointer-events: none; z-index: 3; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+
+    /* export */
+    footer {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px 16px;
+      padding: 14px 22px 18px; border-top: 1px solid var(--edge);
+    }
+    footer #discard { justify-self: start; margin-left: -10px; }
+    .status { color: var(--fog); font-size: 14px; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+    .status b { color: var(--paper); font-weight: 600; }
+    .status .url { color: var(--focus); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+    .prog { width: 140px; height: 4px; border-radius: 2px; background: var(--body-3); overflow: hidden; display: none; }
+    .prog i { display: block; height: 100%; width: 0; background: var(--focus); }
+    .busy .prog { display: block; }
+    .busy .actions .btn { opacity: 0.5; pointer-events: none; }
+    .actions { display: flex; gap: 8px; }
+    .opts { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+    .menu {
+      position: fixed; z-index: 5; padding: 5px; border-radius: var(--r-panel); background: var(--body-2); border: 1px solid var(--edge);
+      box-shadow: var(--shadow-float); min-width: 180px;
+    }
+    .menu button { display: flex; width: 100%; align-items: center; gap: 10px; border: 0; background: none; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px; font-weight: 500; text-align: left; }
+    .menu button:hover { background: var(--body-3); }
+    .menu .dot { width: 9px; height: 9px; border-radius: 50%; }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <video id="video" playsinline muted></video>
+  </div>
+
+  <section class="timeline">
+    <div class="transport">
+      <button class="play" id="play" title="Play or pause (Space)"></button>
+      <div class="tc" id="tc">0:00.0</div>
+      <span class="grow"></span>
+      <div class="clipinfo">
+        <span>Start<b id="lA">0:00.0</b></span>
+        <span>End<b id="lB">0:00.0</b></span>
+        <span>Clip length<b id="lLen">0.0 s</b></span>
+      </div>
+    </div>
+    <div class="strip" id="strip">
+      <canvas id="film"></canvas>
+      <div class="dim" id="dimA"></div>
+      <div class="dim" id="dimB"></div>
+      <div class="win" id="win"></div>
+      <div class="grip a" id="gripA" title="Drag to set the start (I)"></div>
+      <div class="grip b" id="gripB" title="Drag to set the end (O)"></div>
+      <div class="head" id="head"></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="opts row1">
+      <div class="seg" id="fmt">
+        <button data-f="gif">GIF</button>
+        <button data-f="mp4">MP4</button>
+        <button data-f="webm">WebM</button>
+      </div>
+      <label class="field">Frame rate
+        <select id="fps"><option>10</option><option>12</option><option>15</option><option>20</option><option>24</option><option>30</option><option>60</option></select>
+      </label>
+      <label class="field">Width
+        <select id="width">
+          <option value="0">Original</option><option value="1920">1920 px</option><option value="1280">1280 px</option>
+          <option value="960">960 px</option><option value="720">720 px</option><option value="480">480 px</option><option value="320">320 px</option>
+        </select>
+      </label>
+    </div>
+    <div class="status"><span id="status"></span><div class="prog"><i id="bar"></i></div></div>
+    <button class="btn quiet danger" id="discard">Discard</button>
+    <div class="actions">
+      <button class="btn" id="share"></button>
+      <button class="btn" id="upload" title="Upload and copy link (Ctrl+D)"></button>
+      <button class="btn" id="save" title="Save as file (Ctrl+S)"></button>
+      <button class="btn primary" id="copy" title="Copy file (Ctrl+C)"></button>
+    </div>
+  </footer>
+  <div class="menu" id="shareMenu" hidden></div>
+  <script src="icons.js"></script>
+  <script src="preview.js"></script>
+</body>
+</html>

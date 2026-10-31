@@ -1,0 +1,29 @@
+{
+  "name": "glimpse",
+  "productName": "Glimpse",
+  "version": "1.0.0",
+  "description": "Screenshots and GIFs, one key away. A Lightshot-style capture tool for Windows with markup, uploads, and GIF and short video recording.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "speedtest": "electron . --speedtest",
+    "docs": "electron . --docs"
+  },
+  "keywords": ["screenshot", "screen-capture", "gif", "screen-recorder", "lightshot", "gyazo", "windows", "electron"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/04r/glimpse.git"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
+    "electron": "^45.2.1"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "koffi": "^3.3.6",
+    "node-screenshots": "^0.2.8"
+  }
+}

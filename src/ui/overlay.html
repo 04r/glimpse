@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'">
+  <title>Glimpse</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <canvas id="ann"></canvas>
+  <div id="shade"></div>
+  <div id="cross-x" class="cross" hidden></div>
+  <div id="cross-y" class="cross" hidden></div>
+  <div id="sel" hidden>
+    <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+    <i class="m n"></i><i class="m e"></i><i class="m s"></i><i class="m w"></i>
+  </div>
+  <div id="size" class="readout" hidden></div>
+  <div id="loupe" hidden><canvas id="loupe-c" width="132" height="132"></canvas><div id="loupe-info" class="readout"></div></div>
+  <div id="tv" class="toolbar vertical" hidden></div>
+  <div id="th" class="toolbar horizontal" hidden></div>
+  <div id="palette" class="pop" hidden></div>
+  <div id="sharemenu" class="pop menu" hidden></div>
+  <div id="bubble" class="readout" hidden></div>
+  <textarea id="textedit" spellcheck="false" hidden></textarea>
+  <script src="icons.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>

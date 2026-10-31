@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; media-src 'self' file:">
+  <title>Glimpse</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; user-select: none; overflow: hidden; }
+    header { display: flex; align-items: center; gap: 12px; padding: 20px 28px 0; }
+    header .mark { width: 30px; height: 30px; }
+    header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+    .grow { flex: 1; }
+
+    /* capture deck */
+    .deck { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; padding: 22px 28px 8px; }
+    .main-shot {
+      position: relative; min-height: 236px; border: 0; border-radius: 16px; cursor: pointer; text-align: left;
+      background: var(--well); color: var(--paper); padding: 26px 28px; display: flex; flex-direction: column; justify-content: flex-end;
+      box-shadow: inset 0 0 0 1px var(--edge-soft); overflow: hidden;
+    }
+    .main-shot:hover { background: #171a20; }
+    .main-shot .vf { position: absolute; inset: 26px 28px 96px; pointer-events: none; }
+    .main-shot .vf i { position: absolute; width: 34px; height: 34px; border: 0 solid var(--focus); transition: transform 0.14s ease-out; }
+    .main-shot .vf .tl { left: 0; top: 0; border-left-width: 4px; border-top-width: 4px; }
+    .main-shot .vf .tr { right: 0; top: 0; border-right-width: 4px; border-top-width: 4px; }
+    .main-shot .vf .bl { left: 0; bottom: 0; border-left-width: 4px; border-bottom-width: 4px; }
+    .main-shot .vf .br { right: 0; bottom: 0; border-right-width: 4px; border-bottom-width: 4px; }
+    .main-shot .vf .dot { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--focus); border: 0; }
+    .main-shot:hover .vf .tl { transform: translate(10px, 8px); }
+    .main-shot:hover .vf .tr { transform: translate(-10px, 8px); }
+    .main-shot:hover .vf .bl { transform: translate(10px, -8px); }
+    .main-shot:hover .vf .br { transform: translate(-10px, -8px); }
+    .main-shot .t { font-size: 24px; font-weight: 600; letter-spacing: -0.01em; }
+    .main-shot .row { display: flex; align-items: center; gap: 12px; margin-top: 6px; color: var(--fog); font-size: 14.5px; }
+    .keys { display: inline-flex; gap: 4px; }
+
+    .side { display: grid; grid-template-rows: repeat(3, 1fr); gap: 10px; }
+    .act {
+      display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 0; border-radius: 12px; cursor: pointer; text-align: left;
+      background: var(--body-2); color: var(--paper); box-shadow: inset 0 0 0 1px var(--edge-soft); min-height: 68px;
+    }
+    .act:hover { background: var(--body-3); }
+    .act .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--well); flex: none; }
+    .act .ic svg { width: 20px; height: 20px; }
+    .act .ic.rec { color: var(--tally); }
+    .act .tx { flex: 1; min-width: 0; }
+    .act .tx > b { display: block; font-size: 15px; font-weight: 600; }
+    .act .tx > span { display: flex; margin-top: 5px; color: var(--fog); font-size: 13px; }
+
+    /* recent */
+    .recent { padding: 18px 28px 22px; min-height: 0; display: grid; grid-template-rows: auto 1fr; }
+    .recent .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+    .recent h2 { font-size: 16px; font-weight: 600; }
+    .recent .count { color: var(--fog-2); font: 500 14px var(--readout); }
+    .recent .head .btn { margin-left: auto; height: 32px; padding: 0 12px; font-size: 13.5px; }
+    .strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: min-content; gap: 12px; overflow: hidden; }
+    .thumb {
+      position: relative; aspect-ratio: 16 / 10; border-radius: 9px; overflow: hidden; cursor: pointer; border: 0; padding: 0;
+      background: repeating-conic-gradient(#20242c 0 25%, #1a1d24 0 50%) 0 0 / 14px 14px; box-shadow: inset 0 0 0 1px var(--edge-soft);
+    }
+    .thumb:hover { box-shadow: 0 0 0 2px var(--focus); }
+    .thumb img, .thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .thumb .chip { position: absolute; left: 6px; top: 6px; height: 19px; padding: 0 6px; border-radius: 4px; font: 700 11.5px/19px var(--readout); background: rgba(20,23,28,.88); }
+    .thumb .chip.gif { background: var(--focus); color: var(--focus-ink); }
+    .thumb .when { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 8px 5px; font: 600 12.5px var(--readout); text-align: right; background: linear-gradient(transparent, rgba(10,12,16,.8)); }
+    .empty { color: var(--fog); font-size: 14.5px; line-height: 1.6; padding: 18px; border-radius: 12px; background: var(--well); }
+    .empty .key { margin: 0 2px; }
+
+    footer { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="#ffd23f" stroke-width="2.2" stroke-linecap="square"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="#ffd23f" stroke="none"/></svg>
+    <h1>Glimpse</h1>
+    <span class="grow"></span>
+    <button class="btn quiet" id="folder"></button>
+    <button class="btn quiet" id="settings"></button>
+  </header>
+
+  <section class="deck">
+    <button class="main-shot" id="shot">
+      <span class="vf"><i class="tl"></i><i class="tr"></i><i class="bl"></i><i class="br"></i><i class="dot"></i></span>
+      <span class="t">Capture an area</span>
+      <span class="row"><span class="keys" id="k-screenshot"></span><span>Freeze the screen, select, mark up, share</span></span>
+    </button>
+    <div class="side">
+      <button class="act" id="gif"><span class="ic rec" id="ic-gif"></span><span class="tx"><b>Record a GIF</b><span id="k-gif"></span></span></button>
+      <button class="act" id="video"><span class="ic rec" id="ic-video"></span><span class="tx"><b>Record a video</b><span id="k-video"></span></span></button>
+      <button class="act" id="full"><span class="ic" id="ic-full"></span><span class="tx"><b>Capture the whole screen</b><span id="k-fullscreen"></span></span></button>
+    </div>
+  </section>
+
+  <section class="recent">
+    <div class="head">
+      <h2>Recent</h2>
+      <span class="count" id="count"></span>
+      <button class="btn" id="all">See all captures</button>
+    </div>
+    <div class="strip" id="strip"></div>
+  </section>
+
+  <script src="icons.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

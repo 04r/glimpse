@@ -1,0 +1,160 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Settings</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body { display: grid; grid-template-columns: 200px 1fr; height: 100vh; }
+    nav { padding: 26px 14px; border-right: 1px solid var(--edge); display: flex; flex-direction: column; gap: 2px; }
+    nav .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 22px; font-size: 17px; font-weight: 600; }
+    nav .brand svg { width: 26px; height: 26px; }
+    nav a {
+      display: block; padding: 8px 10px; border-radius: 8px; color: var(--fog); text-decoration: none; font-size: 14.5px; font-weight: 500;
+    }
+    nav a:hover { background: var(--body-2); color: var(--paper); }
+    nav a.on { background: var(--body-2); color: var(--paper); box-shadow: inset 3px 0 0 var(--focus); }
+    main { overflow-y: auto; scroll-behavior: smooth; }
+    .wrap { max-width: 640px; padding: 26px 34px 80px; }
+    section { padding-top: 10px; margin-bottom: 30px; }
+    section h2 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+    section > p { margin: 4px 0 12px; color: var(--fog); font-size: 14px; max-width: 60ch; }
+    .rows { border-radius: 12px; background: var(--body-2); box-shadow: inset 0 0 0 1px var(--edge-soft); }
+    .r { display: flex; align-items: center; gap: 14px; padding: 12px 16px; min-height: 58px; }
+    .r + .r { border-top: 1px solid var(--edge); }
+    .r .l { flex: 1; min-width: 0; }
+    .r .l div { font-weight: 600; font-size: 14.5px; }
+    .r .l small { display: block; color: var(--fog); font-size: 13px; margin-top: 1px; }
+    .r select, .r input[type=number] { background: var(--body-3); }
+
+    .hk {
+      min-width: 200px; height: 38px; border-radius: var(--r-btn); border: 0; background: var(--well); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 12px; font-size: 14px;
+      box-shadow: inset 0 0 0 1px var(--edge-soft);
+    }
+    .hk:hover { box-shadow: inset 0 0 0 1px var(--fog-2); }
+    .hk.rec { box-shadow: inset 0 0 0 1.5px var(--focus); color: var(--focus); }
+    .hk.bad { box-shadow: inset 0 0 0 1.5px var(--tally); }
+    .hk .none { color: var(--fog); }
+    .hk .plus { color: var(--fog-2); font-size: 12px; }
+    .x { width: 32px; height: 32px; border: 0; background: transparent; color: var(--fog); border-radius: 8px; cursor: pointer; display: grid; place-items: center; }
+    .x:hover { background: var(--body-3); color: var(--paper); }
+    .x svg { width: 16px; height: 16px; }
+    .path { font: 500 13px var(--readout); color: var(--fog); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+
+    .sw { position: relative; width: 42px; height: 24px; flex: none; }
+    .sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .sw span { position: absolute; inset: 0; border-radius: 12px; background: var(--body-3); cursor: pointer; box-shadow: inset 0 0 0 1px var(--edge-soft); }
+    .sw span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--fog); transition: transform 0.12s, background-color 0.12s; }
+    .sw input:checked + span { background: var(--focus); }
+    .sw input:checked + span::after { transform: translateX(18px); background: var(--focus-ink); }
+    .sw input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+    .warn { margin: 10px 2px 0; color: #ff8a80; font-size: 13.5px; }
+    .note { margin-top: 10px; padding: 12px 14px; border-radius: 10px; background: var(--well); color: var(--fog); font-size: 13.5px; line-height: 1.55; }
+    .note b { color: var(--paper); font-weight: 600; }
+    .unit { color: var(--fog); font-size: 13.5px; }
+  </style>
+</head>
+<body>
+  <nav id="nav">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="#ffd23f" stroke-width="2.2" stroke-linecap="square"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="#ffd23f" stroke="none"/></svg>Glimpse</div>
+    <a href="#shortcuts" class="on">Shortcuts</a>
+    <a href="#saving">Saving</a>
+    <a href="#sharing">Sharing</a>
+    <a href="#recording">Recording</a>
+    <a href="#general">General</a>
+  </nav>
+  <main id="main">
+    <div class="wrap">
+      <section id="shortcuts">
+        <h2>Shortcuts</h2>
+        <p>Click a shortcut, then press the new keys. Esc cancels.</p>
+        <div class="rows" id="hotkeys"></div>
+        <div class="warn" id="hkWarn" hidden></div>
+        <div class="note">If <b>PrtSc</b> also opens Snipping Tool, turn off <b>Use the Print screen key to open screen capture</b> in Windows Settings, under Accessibility and then Keyboard.</div>
+      </section>
+
+      <section id="saving">
+        <h2>Saving</h2>
+        <p>Where Save puts your files.</p>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Save folder</div><small class="path" id="dir"></small></div>
+            <button class="btn" id="pick">Change</button>
+          </div>
+          <div class="r">
+            <div class="l"><div>Save without asking</div><small>Skip the file dialog and use the save folder</small></div>
+            <label class="sw"><input type="checkbox" id="quickSave"><span></span></label>
+          </div>
+        </div>
+      </section>
+
+      <section id="sharing">
+        <h2>Sharing</h2>
+        <p>Uploads are anonymous and need no account. The link is copied for you.</p>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Upload to</div><small>How long the link stays up</small></div>
+            <select id="uploadHost">
+              <option value="catbox">catbox.moe, kept forever</option>
+              <option value="litterbox-1h">litterbox, deleted after 1 hour</option>
+              <option value="litterbox-12h">litterbox, deleted after 12 hours</option>
+              <option value="litterbox-24h">litterbox, deleted after 1 day</option>
+              <option value="litterbox-72h">litterbox, deleted after 3 days</option>
+            </select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Open the link after uploading</div></div>
+            <label class="sw"><input type="checkbox" id="openAfterUpload"><span></span></label>
+          </div>
+        </div>
+      </section>
+
+      <section id="recording">
+        <h2>Recording</h2>
+        <p>Defaults for GIF and video. You can still change them in the editor.</p>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Capture frame rate</div><small>Higher is smoother, files get bigger</small></div>
+            <select id="recordFps"><option>15</option><option>24</option><option>30</option><option>60</option></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Stop recording after</div><small>Keeps clips short</small></div>
+            <input type="number" id="maxRecordSeconds" min="3" max="600" step="1" style="width:84px"><span class="unit">seconds</span>
+          </div>
+          <div class="r">
+            <div class="l"><div>GIF frame rate</div></div>
+            <select id="gifFps"><option>10</option><option>12</option><option>15</option><option>20</option><option>24</option><option>30</option></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>GIF width</div><small>Smaller GIFs load faster in chats</small></div>
+            <select id="gifMaxWidth">
+              <option value="0">Original</option><option value="1280">1280 px</option><option value="960">960 px</option>
+              <option value="720">720 px</option><option value="480">480 px</option><option value="320">320 px</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section id="general">
+        <h2>General</h2>
+        <div class="rows" style="margin-top:12px">
+          <div class="r">
+            <div class="l"><div>Magnifier</div><small>Zoomed pixels and the color under the cursor while selecting</small></div>
+            <label class="sw"><input type="checkbox" id="showMagnifier"><span></span></label>
+          </div>
+          <div class="r">
+            <div class="l"><div>Start with Windows</div></div>
+            <label class="sw"><input type="checkbox" id="launchAtLogin"><span></span></label>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="icons.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
