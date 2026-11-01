@@ -10,6 +10,9 @@ const { pathToFileURL } = require('url');
 const store = require('./store');
 const { upload } = require('./upload');
 const ff = require('./ffmpeg');
+const ocr = require('./ocr');
+const native = require('./native');
+const scrollMod = require('./scroll');
 const { iconPNG } = require('./icon');
 
 // --review renders the screens offscreen for design checks; it must not pop anything on the desktop.
@@ -18,8 +21,9 @@ const REVIEW = process.argv.includes('--review');
 const DOCS = process.argv.includes('--docs');
 // test modes stay quiet: no toasts, no global hotkeys (the user's own Glimpse owns them)
 const MULTI = process.argv.includes('--multitest');
-const QUIET = REVIEW || DOCS || MULTI || process.argv.includes('--speedtest');
-if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW || MULTI) {
+const FEAT = process.argv.includes('--featuretest');
+const QUIET = REVIEW || DOCS || MULTI || FEAT || process.argv.includes('--speedtest');
+if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW || MULTI || FEAT) {
   app.setPath('userData', path.join(app.getPath('temp'), 'glimpse-selftest'));
 }
 if (DOCS) {
@@ -136,7 +140,7 @@ function toast(title, sub = '', opts = {}) {
   const disp = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const wa = disp.workArea;
   const bounds = { x: wa.x + wa.width - W - 12, y: wa.y + wa.height - H - 12, width: W, height: H };
-  const actionLabel = !action ? '' : action.url ? 'Open link' : action.file ? 'Show file' : action.openDashboard ? 'Open Glimpse' : 'Open settings';
+  const actionLabel = !action ? '' : action.url ? 'Open link' : action.file ? 'Show file' : action.open ? 'Open' : action.openDashboard ? 'Open Glimpse' : 'Open settings';
   const payload = { title, sub, kind, clickable: !!action, actionLabel };
   if (!toastWin || toastWin.isDestroyed()) {
     toastWin = new BrowserWindow({
@@ -144,6 +148,7 @@ function toast(title, sub = '', opts = {}) {
       alwaysOnTop: true, focusable: false, show: false, hasShadow: false, type: 'toolbar', webPreferences: webPrefs(),
     });
     toastWin.setAlwaysOnTop(true, "screen-saver");
+    toastWin.setContentProtection(true); // never shows up inside a capture
     noAnim(toastWin);
     toastWin.loadFile(UI('toast.html'));
     toastWin.webContents.once('did-finish-load', () => {
@@ -171,6 +176,7 @@ ipcMain.on('toast:click', () => {
   if (!a) return;
   if (a.url) shell.openExternal(a.url);
   else if (a.file) shell.showItemInFolder(a.file);
+  else if (a.open) shell.openPath(a.open);
   else if (a.settingsUri) shell.openExternal(a.settingsUri);
   else if (a.openSettings) openSettings();
   else if (a.openDashboard) openDashboard();
@@ -197,7 +203,66 @@ function addHistory({ type, buf, srcFile, ext, w, h, savedPath = null }) {
   for (const old of history.splice(300)) fs.rm(old.file, { force: true }, () => {});
   store.saveHistory(history);
   notifyHistory();
+  queueIndex(entry);
   return entry;
+}
+
+// ---------- text in captures (copy text, search) ----------
+
+// Recognised text of a capture; GIFs and videos are read from a frame near the start.
+async function textOf(entry) {
+  if (typeof entry.text === 'string') return entry.text;
+  let img;
+  if (entry.type === 'image') {
+    img = nativeImage.createFromPath(entry.file);
+  } else {
+    const frame = path.join(tempDir(), `${entry.id}-frame.png`);
+    await ff.run(['-y', '-ss', '0.4', '-i', entry.file, '-frames:v', '1', frame]);
+    img = nativeImage.createFromPath(frame);
+    fs.rm(frame, { force: true }, () => {});
+  }
+  if (img.isEmpty()) return '';
+  const lines = await ocr.ocrImage(img);
+  const text = lines.join('\n').trim();
+  updateHistory(entry.id, { text });
+  return text;
+}
+
+// every capture gets indexed in the background, one at a time
+const indexQueue = [];
+let indexing = false;
+function queueIndex(entry) {
+  if (typeof entry.text === 'string' || indexQueue.includes(entry.id)) return;
+  indexQueue.push(entry.id);
+  runIndex();
+}
+async function runIndex() {
+  if (indexing) return;
+  indexing = true;
+  while (indexQueue.length) {
+    const e = history.find((x) => x.id === indexQueue[0]);
+    try {
+      if (e && fs.existsSync(e.file)) await textOf(e);
+    } catch {
+      if (e) updateHistory(e.id, { text: '' });
+    }
+    indexQueue.shift();
+    await sleep(150);
+  }
+  indexing = false;
+}
+
+async function copyTextOf(entry) {
+  toast('Reading text…', '', { sticky: true });
+  try {
+    const text = await textOf(entry);
+    if (!text) return toast('No text found', 'Try a larger or sharper area', { kind: 'error' });
+    await copyTextToClipboard(text);
+    const lines = text.split('\n');
+    toast('Text copied', `${lines[0].slice(0, 60)}${lines.length > 1 ? `  (+${lines.length - 1} more lines)` : ''}`, { kind: 'success' });
+  } catch (err) {
+    toast('Couldn’t read text', err.message, { kind: 'error' });
+  }
 }
 
 function updateHistory(id, patch) {
@@ -520,6 +585,7 @@ const waitFor = async (fn, ms) => {
 };
 
 async function startCapture(mode) {
+  if (scrolling) return void (scrolling.stop = true);
   if (rec) return stopRecording();
   if (overlayActive) return closeOverlays();
   if (captureBusy) return;
@@ -538,6 +604,11 @@ async function startCapture(mode) {
     const gen = ++overlayGen;
     const cur = screen.getCursorScreenPoint();
     const active = screen.getDisplayNearestPoint(cur);
+    // windows under the overlay, front to back, for click-to-capture-a-window
+    let winRects = [];
+    try {
+      winRects = native.windowRects().map((r) => screen.screenToDipRect(null, r));
+    } catch {}
 
     // 1. arm: dim + crosshair appear right away
     for (const o of list) {
@@ -550,6 +621,9 @@ async function startCapture(mode) {
         showMagnifier: settings.showMagnifier,
         cursor: inside ? { x: cur.x - b.x, y: cur.y - b.y } : null,
         screens: screensOf(o.display),
+        windows: winRects
+          .map((r) => ({ x: r.x - b.x, y: r.y - b.y, w: r.width, h: r.height }))
+          .filter((r) => r.x < b.width && r.y < b.height && r.x + r.w > 0 && r.y + r.h > 0),
       });
       o.win.setBounds(b);
       o.parked = false;
@@ -591,11 +665,15 @@ ipcMain.on('overlay:selecting', (e) => {
 });
 
 ipcMain.handle('shot:action', async (_e, { action, png, w, h, network }) => {
-  closeOverlays(action === 'copy' || action === 'upload');
+  closeOverlays(action === 'copy' || action === 'upload' || action === 'ocr');
   const entry = addHistory({ type: 'image', buf: Buffer.from(png), ext: 'png', w, h });
   switch (action) {
     case 'copy':
       return copyEntry(entry);
+    case 'ocr':
+      return copyTextOf(entry);
+    case 'pretty':
+      return void openPretty(entry);
     case 'save':
       return saveEntry(entry);
     case 'upload':
@@ -646,6 +724,153 @@ async function fullscreenShot() {
   }
 }
 
+// ---------- make it pretty ----------
+
+function openPretty(entry) {
+  const win = new BrowserWindow({
+    width: 1180, height: 780, minWidth: 900, minHeight: 560, show: false, backgroundColor: '#1c2027',
+    title: 'Make it pretty', icon: appIcon, autoHideMenuBar: true, webPreferences: webPrefs(),
+  });
+  win.setMenu(null);
+  noAnim(win);
+  win.loadFile(UI('pretty.html'));
+  win.webContents.once('did-finish-load', () => {
+    win.webContents.send('pretty:init', { fileUrl: pathToFileURL(entry.file).href, w: entry.w, h: entry.h });
+    win.show();
+    win.focus();
+  });
+  return win;
+}
+
+ipcMain.handle('pretty:action', async (e, { action, png, w, h }) => {
+  try {
+    const entry = addHistory({ type: 'image', buf: Buffer.from(png), ext: 'png', w, h });
+    if (action === 'copy') await copyEntry(entry);
+    else if (action === 'save') await saveEntry(entry, BrowserWindow.fromWebContents(e.sender));
+    else if (action === 'upload') await uploadEntry(entry);
+    return { ok: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+// ---------- scrolling capture ----------
+
+// the monitor (node-screenshots) that shows display d
+function monitorFor(d) {
+  const mons = shots.Monitor.all();
+  const phys = screen.dipToScreenPoint({ x: d.bounds.x, y: d.bounds.y });
+  let best = null, bestDist = Infinity;
+  for (const m of mons) {
+    const dist = Math.min(
+      Math.abs(m.x() - phys.x) + Math.abs(m.y() - phys.y),
+      Math.abs(m.x() - d.bounds.x) + Math.abs(m.y() - d.bounds.y)
+    );
+    if (dist < bestDist) { bestDist = dist; best = m; }
+  }
+  return best;
+}
+
+// an area on a spanning overlay -> the monitor holding most of it, and the area on that monitor
+function pickPart(display, rect) {
+  if (!display.parts) return { display, rect, trimmed: false };
+  const abs = { x: display.bounds.x + rect.x, y: display.bounds.y + rect.y, w: rect.width, h: rect.height };
+  let best = null, bestA = -1, bestR = null;
+  for (const p of display.parts) {
+    const x1 = Math.max(abs.x, p.bounds.x), y1 = Math.max(abs.y, p.bounds.y);
+    const x2 = Math.min(abs.x + abs.w, p.bounds.x + p.bounds.width), y2 = Math.min(abs.y + abs.h, p.bounds.y + p.bounds.height);
+    const a = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    if (a > bestA) { bestA = a; best = p; bestR = { x: x1 - p.bounds.x, y: y1 - p.bounds.y, width: x2 - x1, height: y2 - y1 }; }
+  }
+  return { display: best, rect: bestR, trimmed: bestA < abs.w * abs.h - 1 };
+}
+
+let scrolling = null; // { stop } while a scrolling capture runs
+
+ipcMain.handle('scroll:start', async (e, { rect }) => {
+  const o = overlays.get(e.sender.id);
+  if (!o) return;
+  const pick = pickPart(o.display, rect);
+  closeOverlays(true);
+  await waitFor(() => [...overlays.values()].every((x) => x.win.isDestroyed() || x.parked), 500);
+  await sleep(80);
+  runScrollCapture(pick.display, pick.rect);
+});
+
+async function runScrollCapture(d, rect) {
+  if (!shots || !native.available) return toast('Scrolling capture is unavailable', 'A screen-capture component failed to load', { kind: 'error' });
+  const m = monitorFor(d);
+  const sf = d.scaleFactor;
+  const px = Math.round(rect.x * sf), py = Math.round(rect.y * sf);
+  const pw = Math.max(16, Math.round(rect.width * sf)), ph = Math.max(16, Math.round(rect.height * sf));
+  const grabArea = () => {
+    const img = m.captureImageSync();
+    const raw = img.toRawSync();
+    const W = img.width;
+    const w = Math.min(pw, W - px), h = Math.min(ph, img.height - py);
+    const out = Buffer.alloc(w * h * 4);
+    for (let y = 0; y < h; y++) raw.copy(out, y * w * 4, ((py + y) * W + px) * 4, ((py + y) * W + px + w) * 4);
+    return { w, h, data: out };
+  };
+  const abs = { x: d.bounds.x + rect.x, y: d.bounds.y + rect.y, width: rect.width, height: rect.height };
+  const center = screen.dipToScreenPoint({ x: Math.round(abs.x + abs.width / 2), y: Math.round(abs.y + abs.height / 2) });
+  const before = native.cursorPos();
+  const notches = Math.max(1, Math.min(5, Math.floor(ph / 260)));
+
+  // yellow frame around the area (kept out of the grabs), like the recording frame
+  const B = 4;
+  const fb = { x: Math.round(abs.x) - B, y: Math.round(abs.y) - B, width: Math.round(abs.width) + B * 2, height: Math.round(abs.height) + B * 2 };
+  const frame = new BrowserWindow({
+    ...fb, frame: false, transparent: true, resizable: false, movable: false, focusable: false, skipTaskbar: true,
+    alwaysOnTop: true, hasShadow: false, enableLargerThanScreen: true, show: false, thickFrame: false, type: 'toolbar',
+    webPreferences: webPrefs(),
+  });
+  frame.setIgnoreMouseEvents(true);
+  noAnim(frame);
+  frame.setContentProtection(true);
+  frame.setAlwaysOnTop(true, 'screen-saver');
+  frame.setBounds(fb);
+  await frame.loadFile(UI('frame-scroll.html'));
+  frame.showInactive();
+
+  scrolling = { stop: false };
+  const stopKey = () => scrolling && (scrolling.stop = true);
+  try {
+    globalShortcut.register('Escape', stopKey);
+  } catch {}
+  toast('Scrolling capture…', 'Press Esc to stop', { sticky: true });
+  try {
+    const res = await scrollMod.scrollCapture({
+      grab: grabArea,
+      scroll: () => {
+        native.setCursorPos(center.x, center.y);
+        native.wheel(-120 * notches);
+      },
+      stopped: () => scrolling.stop,
+      onStep: (n, rows) => toast('Scrolling capture…', `${rows} px so far. Press Esc to stop`, { sticky: true }),
+    });
+    const png = rawToPNG({ width: res.w, height: res.h, data: res.data, rgba: true });
+    const entry = addHistory({ type: 'image', buf: png, ext: 'png', w: res.w, h: res.h });
+    await copyPNGToClipboard(png);
+    if (!res.steps) {
+      toast('Nothing scrolled', 'The visible area was copied. Place the area over something that scrolls.', { kind: 'error', action: { open: entry.file } });
+    } else {
+      const note = res.reason === 'lost' ? ', stopped where the page changed too much to match' : '';
+      toast('Scrolling capture copied', `${res.w} × ${res.h}${note}`, { kind: 'success', action: { open: entry.file } });
+    }
+    return entry;
+  } catch (err) {
+    toast('Scrolling capture failed', err.message, { kind: 'error' });
+  } finally {
+    try {
+      globalShortcut.unregister('Escape');
+    } catch {}
+    if (!frame.isDestroyed()) frame.destroy();
+    if (before) native.setCursorPos(before.x, before.y);
+    scrolling = null;
+  }
+}
+
 // ---------- recording ----------
 
 function setTrayRecording(on) {
@@ -658,22 +883,9 @@ function setTrayRecording(on) {
 ipcMain.handle('rec:start', async (e, { rect, kind }) => {
   const o = overlays.get(e.sender.id);
   if (!o) return;
-  let display = o.display;
-  let trimmed = false;
-  if (display.parts) {
-    // screen recording works per monitor: record the one holding most of the area
-    const abs = { x: display.bounds.x + rect.x, y: display.bounds.y + rect.y, w: rect.width, h: rect.height };
-    let best = null, bestA = -1, bestR = null;
-    for (const p of display.parts) {
-      const x1 = Math.max(abs.x, p.bounds.x), y1 = Math.max(abs.y, p.bounds.y);
-      const x2 = Math.min(abs.x + abs.w, p.bounds.x + p.bounds.width), y2 = Math.min(abs.y + abs.h, p.bounds.y + p.bounds.height);
-      const a = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-      if (a > bestA) { bestA = a; best = p; bestR = { x: x1 - p.bounds.x, y: y1 - p.bounds.y, width: x2 - x1, height: y2 - y1 }; }
-    }
-    trimmed = bestA < abs.w * abs.h - 1;
-    display = best;
-    rect = bestR;
-  }
+  const pick = pickPart(o.display, rect);
+  const display = pick.display, trimmed = pick.trimmed;
+  rect = pick.rect;
   closeOverlays();
   // let the overlay disappear before the first frame
   await waitFor(() => [...overlays.values()].every((x) => x.win.isDestroyed() || x.parked), 500);
@@ -950,6 +1162,10 @@ ipcMain.handle('history:action', async (_e, { id, action }) => {
       return uploadEntry(entry);
     case 'save':
       return saveEntry(entry, historyWin);
+    case 'text':
+      return copyTextOf(entry);
+    case 'pretty':
+      return void openPretty(entry);
     case 'delete':
       history = history.filter((x) => x !== entry);
       fs.rm(entry.file, { force: true }, () => {});
@@ -1149,6 +1365,9 @@ if (!app.requestSingleInstanceLock()) {
     buildOverlays();
     for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, scheduleRebuild);
 
+    // read the text of older captures in the background so Captures can be searched
+    if (!QUIET) setTimeout(() => history.forEach(queueIndex), 6000);
+
     const failed = registerHotkeys();
     if (process.argv.includes('--selftest')) console.log('[selftest] hotkeys failed:', JSON.stringify(failed));
     const shot = settings.hotkeys.screenshot || 'the tray icon';
@@ -1178,6 +1397,12 @@ if (!app.requestSingleInstanceLock()) {
     if (REVIEW) require('./review')({ preload: PRELOAD });
     if (DOCS) require('./docs').run({ preload: PRELOAD, userData: app.getPath('userData') });
     if (MULTI) require('./multitest')({ startCapture, overlays, getRec: () => rec });
+    if (FEAT) {
+      require('./featuretest')({
+        ocr, addHistory, findEntry: (id) => history.find((x) => x.id === id), openHistory, getHistoryWin: () => historyWin,
+        startCapture, overlays, runScrollCapture, openPretty,
+      });
+    }
     if (process.argv.includes('--speedtest')) require('./speedtest')({ startCapture, overlays, timings });
     if (process.argv.includes('--selftest')) {
       require('./selftest')({

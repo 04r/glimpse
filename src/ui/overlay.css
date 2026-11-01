@@ -24,6 +24,11 @@ body.has-sel #shade { display: none; }
 #cross-x { left: 0; right: 0; height: 1px; }
 #cross-y { top: 0; bottom: 0; width: 1px; }
 
+/* hover over a window: click to capture exactly it */
+#snap { position: fixed; pointer-events: none; outline: 3px solid var(--mark); outline-offset: -3px; box-shadow: 0 0 0 200vmax var(--shade); }
+body.has-snap #shade { display: none; }
+body.mode-rec #snap { background: rgba(255, 255, 255, 0.01); }
+
 /* ---- selection: viewfinder brackets ---- */
 #sel {
   position: fixed; pointer-events: none;

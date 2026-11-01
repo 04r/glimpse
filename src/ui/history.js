@@ -2,6 +2,23 @@
 const api = window.glimpse;
 const $ = (id) => document.getElementById(id);
 let filter = 'all';
+let query = '';
+$('sicon').innerHTML = ICONS.search;
+let qTimer;
+$('q').addEventListener('input', () => {
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => {
+    query = $('q').value.trim().toLowerCase();
+    render();
+  }, 120);
+});
+addEventListener('keydown', (e) => {
+  if ((e.ctrlKey && e.key.toLowerCase() === 'f') || (e.key === '/' && document.activeElement !== $('q'))) {
+    e.preventDefault();
+    $('q').focus();
+    $('q').select();
+  }
+});
 
 $('folder').innerHTML = `${ICONS.folder}Open folder`;
 $('folder').onclick = () => api.send('open:folder');
@@ -77,6 +94,8 @@ function tile(e) {
   const acts = el('div', { className: 'acts' });
   acts.append(
     actBtn(ICONS.copy, e.type === 'image' ? 'Copy image' : 'Copy file', 'copy', e.id),
+    actBtn(ICONS.scanText, 'Copy text', 'text', e.id),
+    ...(e.type === 'image' ? [actBtn(ICONS.sparkles, 'Make it pretty', 'pretty', e.id)] : []),
     e.url ? actBtn(ICONS.external, 'Open link', 'browser', e.id) : actBtn(ICONS.upload, 'Upload and copy link', 'upload', e.id),
     actBtn(ICONS.save, 'Save as', 'save', e.id),
     actBtn(ICONS.folder, 'Show in folder', 'folder', e.id),
@@ -92,12 +111,22 @@ function tile(e) {
     el('span', { className: 'size', textContent: fmtSize(e.size || 0) })
   );
   if (e.savedPath) meta.append(el('span', { className: 'saved', textContent: 'Saved', title: e.savedPath }));
-  return el('div', { className: 'shot' }, frame, meta);
+  const kids = [frame, meta];
+  if (query && e.text) {
+    const line = e.text.split('\n').find((l) => l.toLowerCase().includes(query)) || '';
+    const i = line.toLowerCase().indexOf(query);
+    const snip = el('div', { className: 'snip' });
+    snip.append(line.slice(Math.max(0, i - 40), i), el('mark', { textContent: line.slice(i, i + query.length) }), line.slice(i + query.length, i + query.length + 80));
+    kids.push(snip);
+  }
+  return el('div', { className: 'shot' }, ...kids);
 }
 
 async function render() {
   const all = await api.invoke('history:list');
-  const items = all.filter((e) => filter === 'all' || e.type === filter);
+  const items = all.filter(
+    (e) => (filter === 'all' || e.type === filter) && (!query || (e.text || '').toLowerCase().includes(query))
+  );
   $('count').textContent = all.length ? String(all.length) : '';
   const main = $('main');
   main.textContent = '';
@@ -105,7 +134,9 @@ async function render() {
   if (!items.length) {
     const box = el('div', { className: 'empty' });
     box.innerHTML = all.length
-      ? '<h2>None of these yet</h2>Pick another filter to see the rest.'
+      ? query
+        ? '<h2>No captures with that text</h2>Glimpse reads the text in every capture. New ones can take a few seconds to show up.'
+        : '<h2>None of these yet</h2>Pick another filter to see the rest.'
       : '<h2>Nothing captured yet</h2>Press <span class="key">PrtSc</span> to grab part of your screen, or <span class="key">Ctrl</span><span class="key">PrtSc</span> to record a GIF. Every capture lands here.';
     main.append(box);
     return;

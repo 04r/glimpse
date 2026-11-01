@@ -88,6 +88,8 @@ api.on('overlay:arm', (cfg) => {
   if (mode === 'rec') recKind = cfg.mode;
   showMag = cfg.showMagnifier !== false;
   screens = cfg.screens || null;
+  wins = cfg.windows || [];
+  snap = null;
   document.body.classList.remove('mode-shot', 'mode-rec');
   document.body.classList.add('mode-' + mode);
   hasImage = false;
@@ -97,6 +99,7 @@ api.on('overlay:arm', (cfg) => {
   hideToolbars();
   if (cfg.cursor) mouse = cfg.cursor;
   updateCross();
+  updateSnap();
   document.documentElement.style.visibility = '';
   if (mode === 'rec') api.send('overlay:ready', cfg.gen);
 });
@@ -150,7 +153,9 @@ function resetState() {
   bubble.hidden = true;
   loupe.hidden = true;
   selEl.classList.remove('drawing');
-  document.body.classList.remove('has-sel', 'dragging');
+  snapEl.hidden = true;
+  snap = null;
+  document.body.classList.remove('has-sel', 'dragging', 'has-snap');
   document.body.style.cursor = 'crosshair';
   ax.setTransform(1, 0, 0, 1, 0, 0);
   ax.clearRect(0, 0, ann.width, ann.height);
@@ -225,6 +230,10 @@ function buildToolbars() {
       button(ICONS.search, 'Find similar images on Google', 'Ctrl+F', () => act('search')),
       button(ICONS.print, 'Print', 'Ctrl+P', () => act('print')),
       sep(),
+      button(ICONS.scanText, 'Copy the text in this area', 'Ctrl+T', () => act('ocr')),
+      button(ICONS.sparkles, 'Make it pretty', 'Ctrl+B', () => act('pretty')),
+      sep(),
+      button(ICONS.scroll, 'Scrolling capture: scrolls and stitches a long page', 'Ctrl+L', () => startScroll()),
       button(ICONS.gif, 'Record this area as a GIF', 'Ctrl+G', () => startRec('gif')),
       button(ICONS.video, 'Record this area as a video', 'Ctrl+R', () => startRec('video')),
       sep(),
@@ -386,6 +395,30 @@ function hideToolbars() {
 // The monitors this overlay covers, in overlay pixels. One overlay can span several monitors
 // (same scaling), and the bounding box can contain gaps that no monitor shows.
 let screens = null;
+// windows under the overlay (front to back) and the one the cursor is over
+let wins = [];
+let snap = null;
+const snapEl = document.getElementById('snap');
+function updateSnap() {
+  snap = null;
+  if (!sel && !drag && mouse.x >= 0) {
+    const w = wins.find((r) => mouse.x >= r.x && mouse.x < r.x + r.w && mouse.y >= r.y && mouse.y < r.y + r.h);
+    if (w) {
+      const a = screenAt(mouse.x, mouse.y);
+      const x1 = Math.max(w.x, a.x), y1 = Math.max(w.y, a.y);
+      const x2 = Math.min(w.x + w.w, a.x + a.w), y2 = Math.min(w.y + w.h, a.y + a.h);
+      if (x2 - x1 > 20 && y2 - y1 > 20) snap = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+    }
+  }
+  snapEl.hidden = !snap;
+  document.body.classList.toggle('has-snap', !!snap);
+  if (snap) {
+    snapEl.style.left = snap.x + 'px';
+    snapEl.style.top = snap.y + 'px';
+    snapEl.style.width = snap.w + 'px';
+    snapEl.style.height = snap.h + 'px';
+  }
+}
 function screenAt(x, y) {
   const all = screens && screens.length ? screens : [{ x: 0, y: 0, w: innerWidth, h: innerHeight }];
   let best = all[0], bestD = Infinity;
@@ -609,8 +642,10 @@ addEventListener('mousedown', (e) => {
   } else if (sel && tool) {
     return;
   } else {
+    drag = { type: 'new', ox: x, oy: y, snap };
     sel = { x, y, w: 0, h: 0 };
-    drag = { type: 'new', ox: x, oy: y };
+    snapEl.hidden = true;
+    document.body.classList.remove('has-snap');
     api.send('overlay:selecting');
   }
   document.body.classList.add('dragging');
@@ -652,6 +687,7 @@ addEventListener('mousemove', (e) => {
     update();
   } else {
     updateCursor(x, y);
+    updateSnap();
   }
   updateLoupe();
   updateCross();
@@ -663,7 +699,8 @@ addEventListener('mouseup', () => {
   drag = null;
   document.body.classList.remove('dragging');
   if (d.type === 'draw') finishShape();
-  if (d.type === 'new' && sel && (sel.w < 3 || sel.h < 3)) sel = null;
+  // a click without dragging captures the window under the cursor
+  if (d.type === 'new' && sel && (sel.w < 3 || sel.h < 3)) sel = d.snap ? { ...d.snap } : null;
   update();
   updateLoupe();
   updateCross();
@@ -780,6 +817,9 @@ addEventListener('keydown', (e) => {
       p: () => act('print'),
       f: () => act('search'),
       g: () => startRec('gif'),
+      t: () => act('ocr'),
+      b: () => act('pretty'),
+      l: () => startScroll(),
       r: () => startRec('video'),
       y: redo,
       z: () => (e.shiftKey ? redo() : undo()),
@@ -1078,6 +1118,14 @@ function startRec(kind) {
   busy = true;
   document.documentElement.style.visibility = 'hidden';
   api.invoke('rec:start', { rect: { x: sel.x, y: sel.y, width: sel.w, height: sel.h }, kind: kind || recKind });
+}
+
+function startScroll() {
+  if (!sel || busy) return;
+  if (sel.w * S < 40 || sel.h * S < 60) return showBubble('Area too small to scroll');
+  busy = true;
+  document.documentElement.style.visibility = 'hidden';
+  api.invoke('scroll:start', { rect: { x: sel.x, y: sel.y, width: sel.w, height: sel.h } });
 }
 
 function close() {

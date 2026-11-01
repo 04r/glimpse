@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob:">
+  <title>Make it pretty</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <style>
+    body { display: grid; grid-template-columns: 1fr 340px; height: 100vh; user-select: none; overflow: hidden; }
+    .stage { position: relative; min-width: 0; min-height: 0; background: var(--well); display: grid; place-items: center; padding: 34px; }
+    .stage canvas { max-width: 100%; max-height: calc(100vh - 68px); width: auto; height: auto; display: block; border-radius: 3px;
+      background: repeating-conic-gradient(#20242c 0 25%, #1a1d24 0 50%) 0 0 / 18px 18px; }
+    .dims { position: absolute; left: 22px; bottom: 16px; font: 600 14px var(--readout); color: var(--fog); font-variant-numeric: tabular-nums; }
+    aside { display: flex; flex-direction: column; border-left: 1px solid var(--edge); min-height: 0; }
+    .scroll { flex: 1; overflow-y: auto; padding: 22px 22px 8px; }
+    h1 { font-size: 19px; margin-bottom: 18px; letter-spacing: -0.01em; }
+    .grp { margin-bottom: 20px; }
+    .grp > label, .grp > .lab { display: flex; justify-content: space-between; font-size: 14px; color: var(--fog); margin-bottom: 9px; font-weight: 500; }
+    .grp > label b, .grp > .lab b { color: var(--paper); font: 600 14px var(--readout); }
+    .bgs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .bgs button { aspect-ratio: 1; border: 0; border-radius: 9px; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+    .bgs button.on { box-shadow: 0 0 0 2px var(--body), 0 0 0 4px var(--focus); }
+    .bgs button.none { background: repeating-conic-gradient(#3a404c 0 25%, #2a2f38 0 50%) 0 0 / 10px 10px; }
+    input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; background: transparent; margin: 0; }
+    input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--body-3); }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7px; border-radius: 50%; background: var(--focus); box-shadow: 0 0 0 3px var(--body); }
+    .seg { display: flex; width: 100%; }
+    .seg button { flex: 1; padding: 0 6px; }
+    footer { padding: 16px 22px 20px; border-top: 1px solid var(--edge); display: grid; gap: 10px; }
+    footer .row { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; }
+    .status { font-size: 13.5px; color: var(--fog); min-height: 19px; }
+    .status b { color: var(--paper); }
+  </style>
+</head>
+<body>
+  <div class="stage"><canvas id="cv"></canvas><span class="dims readout" id="dims"></span></div>
+  <aside>
+    <div class="scroll">
+      <h1>Make it pretty</h1>
+      <div class="grp"><div class="lab">Background</div><div class="bgs" id="bgs"></div></div>
+      <div class="grp"><label>Padding <b id="padV"></b></label><input type="range" id="pad" min="0" max="200" step="2"></div>
+      <div class="grp"><label>Corners <b id="radV"></b></label><input type="range" id="rad" min="0" max="48" step="1"></div>
+      <div class="grp"><div class="lab">Shadow</div><div class="seg" id="shadow"><button data-v="none">None</button><button data-v="soft">Soft</button><button data-v="strong">Strong</button></div></div>
+      <div class="grp"><div class="lab">Window bar</div><div class="seg" id="bar"><button data-v="none">None</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="grp"><div class="lab">Size</div><div class="seg" id="ratio"><button data-v="auto">Auto</button><button data-v="1.7778">16:9</button><button data-v="1">1:1</button><button data-v="0.8">4:5</button><button data-v="0.5625">9:16</button></div></div>
+    </div>
+    <footer>
+      <div class="status" id="status">Copy pastes the finished image anywhere.</div>
+      <div class="row">
+        <button class="btn" id="save"></button>
+        <button class="btn" id="upload"></button>
+        <button class="btn primary" id="copy"></button>
+      </div>
+    </footer>
+  </aside>
+  <script src="icons.js"></script>
+  <script src="pretty.js"></script>
+</body>
+</html>

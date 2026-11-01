@@ -1,7 +1,7 @@
 {
   "name": "glimpse",
   "productName": "Glimpse",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Screenshots and GIFs, one key away. A Lightshot-style capture tool for Windows with markup, uploads, and GIF and short video recording.",
   "main": "src/main.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "docs": "electron . --docs",
     "dist": "electron-builder --win nsis --x64",
     "assets": "electron tools/make-assets.js",
-    "multitest": "electron . --multitest"
+    "multitest": "electron . --multitest",
+    "featuretest": "electron . --featuretest"
   },
   "keywords": [
     "screenshot",
@@ -65,7 +66,8 @@
     ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
-      "**/*.node"
+      "**/*.node",
+      "src/ocr.ps1"
     ],
     "win": {
       "target": [
