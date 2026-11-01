@@ -17,6 +17,7 @@ Press <kbd>PrtSc</kbd> and the screen freezes. Drag over what you need, mark it 
 - **Instant:** the screen freezes about 50 ms after the key, with no window animation.
 - **Mark-up:** arrows, shapes, text, highlighter, numbered steps, and pixelate for anything private.
 - **Share:** copy to clipboard, save as PNG/JPG, or upload for a link. Also share to social, find similar images with Google Lens, or print.
+- **Every monitor at once:** all screens freeze together, and a selection can run across them. <kbd>Ctrl</kbd> <kbd>A</kbd> selects the screen under the cursor; press it again to select all of them.
 - **GIF and video:** record any area, trim it on a filmstrip, and export GIF, MP4 or WebM.
 - **History:** a dashboard and a list of past captures, a double-click on the tray icon away.
 

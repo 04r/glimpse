@@ -17,8 +17,9 @@ const REVIEW = process.argv.includes('--review');
 // --docs renders the README screenshots from a sample page and demo history
 const DOCS = process.argv.includes('--docs');
 // test modes stay quiet: no toasts, no global hotkeys (the user's own Glimpse owns them)
-const QUIET = REVIEW || DOCS || process.argv.includes('--speedtest');
-if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW) {
+const MULTI = process.argv.includes('--multitest');
+const QUIET = REVIEW || DOCS || MULTI || process.argv.includes('--speedtest');
+if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW || MULTI) {
   app.setPath('userData', path.join(app.getPath('temp'), 'glimpse-selftest'));
 }
 if (DOCS) {
@@ -362,11 +363,41 @@ function createOverlayWindow(d) {
   win.loadFile(UI('overlay.html'));
 }
 
+// ---------- monitors ----------
+// Test hook: GLIMPSE_FAKE_DISPLAYS='[{"id":1,"bounds":{"x":0,"y":0,"width":960,"height":1080},"scaleFactor":1}, ...]'
+// simulates another monitor layout on a single-screen machine.
+function getDisplays() {
+  if (process.env.GLIMPSE_FAKE_DISPLAYS) {
+    try {
+      return JSON.parse(process.env.GLIMPSE_FAKE_DISPLAYS).map((d) => ({
+        ...d, size: { width: d.bounds.width, height: d.bounds.height }, workArea: d.workArea || d.bounds,
+      }));
+    } catch {}
+  }
+  return screen.getAllDisplays();
+}
+
+// Like Lightshot, one overlay covers every monitor, so a selection can cross between them.
+// That needs one shared scale factor (a window renders at a single DPI); with mixed scaling
+// each monitor keeps its own overlay.
+function overlayTargets() {
+  const ds = getDisplays();
+  if (ds.length < 2 || !ds.every((d) => d.scaleFactor === ds[0].scaleFactor)) return ds;
+  const x1 = Math.min(...ds.map((d) => d.bounds.x)), y1 = Math.min(...ds.map((d) => d.bounds.y));
+  const x2 = Math.max(...ds.map((d) => d.bounds.x + d.bounds.width)), y2 = Math.max(...ds.map((d) => d.bounds.y + d.bounds.height));
+  const bounds = { x: x1, y: y1, width: x2 - x1, height: y2 - y1 };
+  return [{ id: 'all', bounds, size: { width: bounds.width, height: bounds.height }, scaleFactor: ds[0].scaleFactor, workArea: bounds, parts: ds }];
+}
+
+// monitor rects inside an overlay, in overlay pixels
+const screensOf = (d) =>
+  (d.parts || [d]).map((p) => ({ x: p.bounds.x - d.bounds.x, y: p.bounds.y - d.bounds.y, w: p.bounds.width, h: p.bounds.height }));
+
 function buildOverlays() {
   rebuildPending = false;
   for (const { win } of overlays.values()) if (!win.isDestroyed()) win.destroy();
   overlays.clear();
-  for (const d of screen.getAllDisplays()) createOverlayWindow(d);
+  for (const d of overlayTargets()) createOverlayWindow(d);
 }
 
 let rebuildTimer = null;
@@ -416,12 +447,34 @@ async function grabCapturer(displays) {
 }
 
 async function grab(displays) {
+  const flat = displays.flatMap((d) => d.parts || [d]);
+  let imgs = null;
   if (shots) {
     try {
-      return await grabNative(displays);
+      imgs = await grabNative(flat);
     } catch {}
   }
-  return grabCapturer(displays);
+  if (!imgs) imgs = await grabCapturer(flat);
+  for (const d of displays) if (d.parts) imgs[d.id] = stitch(d, imgs);
+  return imgs;
+}
+
+// one frozen image of every monitor, laid out as they are arranged; gaps between monitors stay dark
+function stitch(v, imgs) {
+  const sf = v.scaleFactor;
+  const W = Math.round(v.bounds.width * sf), H = Math.round(v.bounds.height * sf);
+  const out = Buffer.alloc(W * H * 4, Buffer.from([0x14, 0x17, 0x1c, 0xff]));
+  let rgba = true;
+  for (const p of v.parts) {
+    const im = imgs[p.id];
+    if (!im) continue;
+    rgba = im.rgba;
+    const ox = Math.round((p.bounds.x - v.bounds.x) * sf), oy = Math.round((p.bounds.y - v.bounds.y) * sf);
+    const w = Math.min(im.width, W - ox, Math.round(p.bounds.width * sf));
+    const h = Math.min(im.height, H - oy, Math.round(p.bounds.height * sf));
+    for (let y = 0; y < h; y++) im.data.copy(out, ((oy + y) * W + ox) * 4, y * im.width * 4, y * im.width * 4 + w * 4);
+  }
+  return { width: W, height: H, data: out, rgba };
 }
 
 function park(o) {
@@ -496,6 +549,7 @@ async function startCapture(mode) {
         mode,
         showMagnifier: settings.showMagnifier,
         cursor: inside ? { x: cur.x - b.x, y: cur.y - b.y } : null,
+        screens: screensOf(o.display),
       });
       o.win.setBounds(b);
       o.parked = false;
@@ -604,13 +658,29 @@ function setTrayRecording(on) {
 ipcMain.handle('rec:start', async (e, { rect, kind }) => {
   const o = overlays.get(e.sender.id);
   if (!o) return;
-  const display = o.display;
+  let display = o.display;
+  let trimmed = false;
+  if (display.parts) {
+    // screen recording works per monitor: record the one holding most of the area
+    const abs = { x: display.bounds.x + rect.x, y: display.bounds.y + rect.y, w: rect.width, h: rect.height };
+    let best = null, bestA = -1, bestR = null;
+    for (const p of display.parts) {
+      const x1 = Math.max(abs.x, p.bounds.x), y1 = Math.max(abs.y, p.bounds.y);
+      const x2 = Math.min(abs.x + abs.w, p.bounds.x + p.bounds.width), y2 = Math.min(abs.y + abs.h, p.bounds.y + p.bounds.height);
+      const a = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+      if (a > bestA) { bestA = a; best = p; bestR = { x: x1 - p.bounds.x, y: y1 - p.bounds.y, width: x2 - x1, height: y2 - y1 }; }
+    }
+    trimmed = bestA < abs.w * abs.h - 1;
+    display = best;
+    rect = bestR;
+  }
   closeOverlays();
   // let the overlay disappear before the first frame
   await waitFor(() => [...overlays.values()].every((x) => x.win.isDestroyed() || x.parked), 500);
   await sleep(60);
   try {
     await startRecording(display, rect, kind);
+    if (trimmed) toast('Recording one screen', 'GIFs and videos record one monitor at a time, so the area was trimmed to fit', { kind: 'info' });
   } catch (err) {
     closeRec();
     toast('Recording failed', err.message, { kind: 'error' });
@@ -1107,6 +1177,7 @@ if (!app.requestSingleInstanceLock()) {
     if (process.argv.includes('--capture')) startCapture('shot');
     if (REVIEW) require('./review')({ preload: PRELOAD });
     if (DOCS) require('./docs').run({ preload: PRELOAD, userData: app.getPath('userData') });
+    if (MULTI) require('./multitest')({ startCapture, overlays, getRec: () => rec });
     if (process.argv.includes('--speedtest')) require('./speedtest')({ startCapture, overlays, timings });
     if (process.argv.includes('--selftest')) {
       require('./selftest')({

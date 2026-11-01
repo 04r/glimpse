@@ -87,6 +87,7 @@ api.on('overlay:arm', (cfg) => {
   mode = cfg.mode === 'shot' ? 'shot' : 'rec';
   if (mode === 'rec') recKind = cfg.mode;
   showMag = cfg.showMagnifier !== false;
+  screens = cfg.screens || null;
   document.body.classList.remove('mode-shot', 'mode-rec');
   document.body.classList.add('mode-' + mode);
   hasImage = false;
@@ -382,31 +383,50 @@ function hideToolbars() {
   hideTip();
 }
 
+// The monitors this overlay covers, in overlay pixels. One overlay can span several monitors
+// (same scaling), and the bounding box can contain gaps that no monitor shows.
+let screens = null;
+function screenAt(x, y) {
+  const all = screens && screens.length ? screens : [{ x: 0, y: 0, w: innerWidth, h: innerHeight }];
+  let best = all[0], bestD = Infinity;
+  for (const r of all) {
+    const dx = Math.max(r.x - x, 0, x - (r.x + r.w)), dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = r; }
+  }
+  return best;
+}
+
 function showToolbars() {
   if (!sel) return;
   const m = 8;
+  // keep both toolbars on the monitor that shows the selection's bottom-right corner
+  const A = screenAt(sel.x + sel.w - 1, sel.y + sel.h - 1);
+  const L = A.x + 2, T = A.y + 2, R = A.x + A.w - 2, B = A.y + A.h - 2;
   if (mode === 'shot') {
     tv.hidden = false;
     const vw = tv.offsetWidth, vh = tv.offsetHeight;
     let x = sel.x + sel.w + m;
-    if (x + vw > innerWidth - 2) x = sel.x - m - vw;
-    if (x < 2) x = sel.x + sel.w - vw - m;
+    if (x + vw > R) x = sel.x - m - vw;
+    if (x < L) x = sel.x + sel.w - vw - m;
+    x = clamp(x, L, R - vw);
     let y = sel.y + sel.h - vh;
-    y = clamp(y, 2, innerHeight - vh - 2);
+    y = clamp(y, T, B - vh);
     tv.style.left = x + 'px';
     tv.style.top = y + 'px';
   }
   th.hidden = false;
   const hw = th.offsetWidth, hh = th.offsetHeight;
   let x = sel.x + sel.w - hw;
-  x = clamp(x, 2, innerWidth - hw - 2);
+  x = clamp(x, L, R - hw);
   let y = sel.y + sel.h + m;
-  if (y + hh > innerHeight - 2) y = sel.y - m - hh;
-  if (y < 2) y = sel.y + sel.h - hh - m;
+  if (y + hh > B) y = sel.y - m - hh;
+  if (y < T) y = sel.y + sel.h - hh - m;
+  y = clamp(y, T, B - hh);
   // keep clear of the vertical toolbar if both ended up inside the selection
   if (mode === 'shot' && !tv.hidden) {
     const a = tv.getBoundingClientRect();
-    if (x < a.right && x + hw > a.left && y < a.bottom && y + hh > a.top) x = clamp(a.left - hw - 6, 2, innerWidth - hw - 2);
+    if (x < a.right && x + hw > a.left && y < a.bottom && y + hh > a.top) x = clamp(a.left - hw - 6, L, R - hw);
   }
   th.style.left = x + 'px';
   th.style.top = y + 'px';
@@ -557,9 +577,10 @@ function updateLoupe() {
     `<span class="k">Position</span><span>${px}, ${py}</span>` +
     `<span class="hex"><span class="sw" style="background:${hex}"></span>${hex.toUpperCase()}</span>` +
     `<span class="note">Press C to copy the color</span>`;
+  const scr = screenAt(mouse.x, mouse.y);
   let x = mouse.x + 22, y = mouse.y + 22;
-  if (x + 140 > innerWidth) x = mouse.x - 22 - 140;
-  if (y + 200 > innerHeight) y = mouse.y - 22 - 200;
+  if (x + 140 > scr.x + scr.w) x = mouse.x - 22 - 140;
+  if (y + 200 > scr.y + scr.h) y = mouse.y - 22 - 200;
   loupe.style.left = x + 'px';
   loupe.style.top = y + 'px';
 }
@@ -714,7 +735,10 @@ addEventListener('keydown', (e) => {
   }
   if (ctrl && lower === 'a') {
     e.preventDefault();
-    sel = { x: 0, y: 0, w: innerWidth, h: innerHeight };
+    // first press: the monitor under the cursor; again: every monitor
+    const scr = screenAt(mouse.x >= 0 ? mouse.x : innerWidth / 2, mouse.y >= 0 ? mouse.y : innerHeight / 2);
+    const same = sel && sel.x === scr.x && sel.y === scr.y && sel.w === scr.w && sel.h === scr.h;
+    sel = same && screens && screens.length > 1 ? { x: 0, y: 0, w: innerWidth, h: innerHeight } : { x: scr.x, y: scr.y, w: scr.w, h: scr.h };
     api.send('overlay:selecting');
     update();
     updateCross();
