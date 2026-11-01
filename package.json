@@ -1,7 +1,7 @@
 {
   "name": "glimpse",
   "productName": "Glimpse",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Screenshots and GIFs, one key away. A Lightshot-style capture tool for Windows with markup, uploads, and GIF and short video recording.",
   "main": "src/main.js",
   "scripts": {

@@ -1,0 +1,61 @@
+body {
+  display: grid; grid-template-columns: 290px 1fr 316px; grid-template-rows: 60px 1fr; height: 100vh;
+  user-select: none; overflow: hidden;
+}
+.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 20px; border-bottom: 1px solid var(--edge); }
+.top .title { font-size: 16px; font-weight: 600; margin-right: 14px; }
+.top .grow { flex: 1; }
+.top .status { font-size: 13.5px; color: var(--fog); margin-right: 6px; white-space: nowrap; }
+.top .status b { color: var(--paper); }
+.top .btn { height: 36px; }
+.sizes { display: flex; gap: 4px; padding: 3px; border-radius: var(--r-btn); background: var(--well); }
+.sizes button {
+  height: 30px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: var(--fog); cursor: pointer;
+  font: 600 13px var(--ui); display: flex; align-items: center; gap: 7px;
+}
+.sizes button i { display: inline-block; border: 1.5px solid currentColor; border-radius: 2px; }
+.sizes button:hover { color: var(--paper); }
+.sizes button.on { background: var(--body-3); color: var(--paper); }
+
+aside { overflow-y: auto; overflow-x: hidden; padding: 4px 18px 24px; }
+aside.left { border-right: 1px solid var(--edge); }
+aside.right { border-left: 1px solid var(--edge); }
+section { padding: 16px 0 6px; border-bottom: 1px solid var(--edge); }
+section:last-child { border-bottom: 0; }
+h2 { font-size: 13.5px; font-weight: 600; color: var(--paper); margin-bottom: 12px; }
+.ctl { margin: 10px 0 12px; }
+.ctl > label, .ctl > .lab { display: flex; justify-content: space-between; font-size: 13px; color: var(--fog); margin-bottom: 7px; font-weight: 500; }
+.ctl > label b { color: var(--paper); font: 600 13px var(--readout); font-variant-numeric: tabular-nums; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 18px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--body-3); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--focus); box-shadow: 0 0 0 3px var(--body); }
+.seg.wide { display: flex; width: 100%; }
+.seg.wide button { flex: 1; padding: 0 4px; height: 30px; font-size: 12.5px; }
+.field input { width: 100%; height: 34px; margin-top: 10px; }
+
+/* frame and preset tiles */
+.frames, .tilts, .shadows { display: grid; gap: 8px; }
+.frames { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tilts { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 6px; }
+.shadows { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.tile {
+  display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 2px 6px; border: 0; border-radius: 10px;
+  background: var(--body-2); color: var(--fog); cursor: pointer; font: 600 11.5px var(--ui); box-shadow: inset 0 0 0 1px var(--edge-soft);
+}
+.tile:hover { color: var(--paper); background: var(--body-3); }
+.tile.on { color: var(--paper); box-shadow: inset 0 0 0 1.5px var(--focus); background: var(--body-3); }
+.tile svg { display: block; }
+
+.bgs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-top: 12px; }
+.bgs button { aspect-ratio: 1; border: 0; border-radius: 9px; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); background-size: cover; }
+.bgs button.on { box-shadow: 0 0 0 2px var(--body), 0 0 0 4px var(--focus); }
+.custom, .check { display: flex !important; align-items: center; gap: 10px; justify-content: flex-start !important; cursor: pointer; color: var(--fog); }
+.custom input[type=color] { width: 28px; height: 28px; border: 0; padding: 0; background: none; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: var(--focus); }
+
+.stage { position: relative; min-width: 0; min-height: 0; background: var(--well); display: grid; place-items: center; padding: 28px; }
+.stage canvas {
+  max-width: 100%; max-height: calc(100vh - 60px - 56px); width: auto; height: auto; display: block;
+  background: repeating-conic-gradient(#20242c 0 25%, #1a1d24 0 50%) 0 0 / 18px 18px; box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.8);
+}
+.dims { position: absolute; left: 18px; bottom: 12px; font: 600 13px var(--readout); color: var(--fog); }

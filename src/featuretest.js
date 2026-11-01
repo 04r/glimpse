@@ -57,9 +57,53 @@ module.exports = async (h) => {
 
   }
 
+  // ---------- 5. make it pretty ----------
+  async function prettyPart(entry) {
+    const pw = h.openPretty(entry);
+    await until(() => pw.isVisible());
+    await wait(900);
+    fs.writeFileSync(path.join(out, 'f-pretty.png'), (await pw.webContents.capturePage()).toPNG());
+    await clipboard.writeText('x');
+    // a few looks, saved for review
+    const looks = [
+      { frame: 'browser', url: 'fjordnotes.example', tilt: 'hero', rx: -18, ry: -24, rz: 5, bgKind: 'gradient', bg: 'sunrise', shadow: 'deep', size: '16:9' },
+      { frame: 'phone', tilt: 'left', rx: 4, ry: 30, rz: 0, bgKind: 'mesh', bg: 'aurora', shadow: 'float', size: '4:5' },
+      { frame: 'laptop', tilt: 'isoL', rx: -52, ry: 0, rz: -38, bgKind: 'mesh', bg: 'bloom', shadow: 'soft', size: '1:1' },
+      { frame: 'glass', tilt: 'back', rx: -38, ry: 0, rz: 0, bgKind: 'blur', bg: '', shadow: 'soft', size: '9:16', grain: true },
+      { frame: 'browserDark', tilt: 'right', rx: 4, ry: -30, rz: 0, bgKind: 'solid', bg: '#2b3440', shadow: 'hard', size: '3:2' },
+      { frame: 'tablet', tilt: 'flat', rx: 0, ry: 0, rz: 0, bgKind: 'gradient', bg: 'ocean', shadow: 'soft', size: 'auto' },
+    ];
+    for (let i = 0; i < looks.length; i++) {
+      await pw.webContents.executeJavaScript(`Object.assign(opt, ${JSON.stringify(looks[i])}); sync(); draw(); true`);
+      await wait(500);
+      fs.writeFileSync(path.join(out, `f-pretty-${i + 1}.png`), (await pw.webContents.capturePage()).toPNG());
+    }
+    await pw.webContents.executeJavaScript(`Object.assign(opt, { size: '1:1', tilt: 'hero', rx: -18, ry: -24, rz: 5 }); sync(); run('copy')`);
+    let ci = { width: 0, height: 0 };
+    for (let i = 0; i < 50 && !ci.width; i++) {
+      await wait(100);
+      const items = await clipboard.read();
+      const it = items.find((x) => x.types.includes('image/png'));
+      if (it) ci = nativeImage.createFromBuffer(Buffer.from(await (await it.getType('image/png')).arrayBuffer())).getSize();
+    }
+    log('pretty copy', JSON.stringify(ci));
+    expect(ci.width === ci.height && ci.width === 1600, `Make it pretty exports a tilted 1:1 image at full size (${ci.width} x ${ci.height})`);
+    pw.close();
+  }
+
   try {
     await wait(1200);
 
+    if (process.env.GLIMPSE_ONLY_PRETTY) {
+      const tw = page(`<body style="margin:0;background:#fff;font:600 34px Segoe UI;color:#111;padding:30px">Invoice 48213<br>Total due: 1,250.00 EUR<br>Glimpse reads text offline</body>`, { width: 700, height: 260, useContentSize: true });
+      await new Promise((r) => tw.webContents.once("did-finish-load", r));
+      await wait(300);
+      const timg = await tw.webContents.capturePage();
+      tw.destroy();
+      await prettyPart(h.addHistory({ type: "image", buf: timg.toPNG(), ext: "png", w: 700, h: 260 }));
+      log(ok ? "ALL PASSED" : "FAILED");
+      return setTimeout(() => app.exit(0), 300);
+    }
     if (process.env.GLIMPSE_ONLY_SCROLL) { await scrollPart(); log('DONE'); return setTimeout(() => app.exit(0), 300); }
     // ---------- 1. copy text (OCR) ----------
     const tw = page(`<body style="margin:0;background:#fff;font:600 34px Segoe UI;color:#111;padding:30px">
@@ -162,23 +206,7 @@ module.exports = async (h) => {
 
     await scrollPart();
 
-    // ---------- 5. make it pretty ----------
-    const pw = h.openPretty(entry);
-    await until(() => pw.isVisible());
-    await wait(900);
-    fs.writeFileSync(path.join(out, 'f-pretty.png'), (await pw.webContents.capturePage()).toPNG());
-    await clipboard.writeText('x');
-    await pw.webContents.executeJavaScript(`set('ratio', '1'); run('copy')`);
-    let ci = { width: 0, height: 0 };
-    for (let i = 0; i < 50 && !ci.width; i++) {
-      await wait(100);
-      const items = await clipboard.read();
-      const it = items.find((x) => x.types.includes('image/png'));
-      if (it) ci = nativeImage.createFromBuffer(Buffer.from(await (await it.getType('image/png')).arrayBuffer())).getSize();
-    }
-    log('pretty copy', JSON.stringify(ci));
-    expect(ci.width === ci.height && ci.width > 700, 'Make it pretty copies a padded, square image');
-    pw.close();
+    await prettyPart(entry);
   } catch (e) {
     ok = false;
     log('FAIL', e.stack || e);

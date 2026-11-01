@@ -741,7 +741,7 @@ async function fullscreenShot() {
 
 function openPretty(entry) {
   const win = new BrowserWindow({
-    width: 1180, height: 780, minWidth: 900, minHeight: 560, show: false, backgroundColor: '#1c2027',
+    width: 1460, height: 900, minWidth: 1120, minHeight: 680, show: false, backgroundColor: '#1c2027',
     title: 'Make it pretty', icon: appIcon, autoHideMenuBar: true, webPreferences: webPrefs(),
   });
   win.setMenu(null);

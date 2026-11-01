@@ -19,7 +19,7 @@ Press <kbd>PrtSc</kbd> and the screen freezes. Drag over what you need, mark it 
 - **Mark-up:** arrows, shapes, text, highlighter, numbered steps, and pixelate for anything private.
 - **Grab text:** in the overlay, press <kbd>X</kbd> (or <kbd>Ctrl</kbd> <kbd>T</kbd>) and drag over any text: an image, a video, a game. It's copied right away and you stay in the overlay. It runs on Windows' built-in OCR and works offline.
 - **Scrolling capture:** select part of a long page or chat, and Glimpse scrolls it and stitches one tall image. Sticky headers appear once.
-- **Make it pretty:** put a capture on a gradient with padding, rounded corners, a shadow and an optional window bar. Sizes for 16:9, square, 4:5 and 9:16.
+- **Make it pretty:** a full mockup editor. Browser, window, phone, tablet and laptop frames, 3D tilt (presets or free X/Y/Z rotation with perspective), shadows, gradient, mesh, solid or blurred backgrounds, grain, and sizes from 16:9 to 9:16. Export at 1× or 2×.
 - **Share:** copy to clipboard, save as PNG/JPG, or upload for a link. Also share to social, find similar images with Google Lens, or print.
 - **Every monitor at once:** all screens freeze together, and a selection can run across them. <kbd>Ctrl</kbd> <kbd>A</kbd> selects the screen under the cursor; press it again to select all of them.
 - **GIF and video:** record any area, trim it on a filmstrip, and export GIF, MP4 or WebM.
