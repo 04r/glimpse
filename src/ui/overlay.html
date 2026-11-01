@@ -26,6 +26,12 @@
   <div id="sharemenu" class="pop menu" hidden></div>
   <div id="bubble" class="readout" hidden></div>
   <textarea id="textedit" spellcheck="false" hidden></textarea>
+  <div id="ocrbox" hidden></div>
+  <div id="ocrpanel" class="pop" hidden>
+    <div class="head"><span class="spin"></span><span id="ocrstatus"></span><button id="ocrclose" title="Close (Esc)">✕</button></div>
+    <textarea id="ocrtext" spellcheck="false" rows="3"></textarea>
+    <div class="foot"><span>Select part of it to copy only that</span><button id="ocrcopy">Copy</button></div>
+  </div>
   <script src="icons.js"></script>
   <script src="overlay.js"></script>
 </body>

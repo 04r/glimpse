@@ -660,6 +660,19 @@ ipcMain.on('overlay:ready', (e, gen) => {
 
 ipcMain.on('overlay:close', () => closeOverlays());
 
+// grab text: the overlay sends the part the user dragged over; its text is copied, the overlay stays
+ipcMain.handle('ocr:region', async (_e, { png }) => {
+  try {
+    const lines = await ocr.ocrImage(nativeImage.createFromBuffer(Buffer.from(png)));
+    if (lines.length) await copyTextToClipboard(lines.join('\n'));
+    return { lines };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+// start the text-recognition worker as soon as the tool is picked, so the first grab is quick
+ipcMain.on('ocr:warm', () => ocr.warm());
+
 ipcMain.on('overlay:selecting', (e) => {
   for (const [id, o] of overlays) if (id !== e.sender.id && !o.win.isDestroyed()) o.win.webContents.send('overlay:clear');
 });

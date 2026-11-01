@@ -17,7 +17,7 @@ Press <kbd>PrtSc</kbd> and the screen freezes. Drag over what you need, mark it 
 - **Instant:** the screen freezes about 50 ms after the key, with no window animation.
 - **Snap to windows:** hover a window and it lights up. Click without dragging to capture exactly that window.
 - **Mark-up:** arrows, shapes, text, highlighter, numbered steps, and pixelate for anything private.
-- **Copy text:** grab the text out of any image, video or game on screen. It runs on Windows' built-in OCR and works offline.
+- **Grab text:** in the overlay, press <kbd>X</kbd> (or <kbd>Ctrl</kbd> <kbd>T</kbd>) and drag over any text: an image, a video, a game. It's copied right away and you stay in the overlay. It runs on Windows' built-in OCR and works offline.
 - **Scrolling capture:** select part of a long page or chat, and Glimpse scrolls it and stitches one tall image. Sticky headers appear once.
 - **Make it pretty:** put a capture on a gradient with padding, rounded corners, a shadow and an optional window bar. Sizes for 16:9, square, 4:5 and 9:16.
 - **Share:** copy to clipboard, save as PNG/JPG, or upload for a link. Also share to social, find similar images with Google Lens, or print.

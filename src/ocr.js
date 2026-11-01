@@ -91,4 +91,11 @@ function stop() {
   if (proc) proc.kill();
 }
 
-module.exports = { ocrFile, ocrImage, stop };
+// spin the worker up ahead of the first request
+function warm() {
+  if (!proc) start();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => proc && proc.kill(), 120000);
+}
+
+module.exports = { ocrFile, ocrImage, warm, stop };

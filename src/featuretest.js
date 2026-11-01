@@ -74,6 +74,45 @@ module.exports = async (h) => {
     log('ocr', Date.now() - t0, 'ms:', JSON.stringify(lines));
     expect(/48213/.test(text) && /1,250\.00/.test(text) && /offline/i.test(text), 'reads the text in a capture');
 
+    // ---------- 1b. grab text inside the overlay ----------
+    const gw = page(`<body style="margin:0;background:#fff;font:600 40px Segoe UI;color:#111;padding:36px">
+      Order 77341 shipped<br>Tracking ZX-55120</body>`, { x: 200, y: 150, width: 760, height: 260, useContentSize: true, alwaysOnTop: true });
+    await new Promise((r) => gw.webContents.once('did-finish-load', r));
+    gw.showInactive();
+    await wait(600);
+    h.startCapture('shot');
+    await until(() => [...h.overlays.values()].every((x) => x.ready));
+    const go = [...h.overlays.values()][0];
+    const gjs = (c) => go.win.webContents.executeJavaScript(c);
+    const b0 = gw.getContentBounds(), ob = go.win.getBounds();
+    const gx = b0.x - ob.x, gy = b0.y - ob.y;
+    await clipboard.writeText('-');
+    await gjs(`(() => {
+      sel = { x: 40, y: 40, w: 300, h: 200 }; update();
+      setTool('ocr');
+      const ev = (t, x, y) => document.body.dispatchEvent(new MouseEvent(t, { clientX: x, clientY: y, button: 0, bubbles: true }));
+      ev('mousedown', ${gx + 20}, ${gy + 20});
+      ev('mousemove', ${gx + 600}, ${gy + 200});
+      ev('mouseup', ${gx + 600}, ${gy + 200});
+      return true; })()`);
+    await until(() => false, 200).catch(() => {});
+    let grab = null;
+    for (let i = 0; i < 60; i++) {
+      await wait(100);
+      grab = await gjs(`({ status: ocrStatus.textContent, text: ocrText.value, panel: !ocrPanel.hidden, sel: JSON.stringify(sel), tool })`);
+      if (/Copied|No text/.test(grab.status)) break;
+    }
+    const clip = await clipboard.readText();
+    log('grab', JSON.stringify(grab), 'clipboard:', JSON.stringify(clip));
+    expect(/77341/.test(grab.text) && /ZX-55120/.test(grab.text), 'dragging over text reads just that text');
+    expect(/77341/.test(clip), 'the text is on the clipboard right away');
+    expect(grab.panel && /Copied/.test(grab.status), 'a small panel shows what was copied');
+    expect(h.overlays.size && [...h.overlays.values()][0].ready && grab.sel === JSON.stringify({ x: 40, y: 40, w: 300, h: 200 }), 'the screenshot overlay and its selection stay put');
+    fs.writeFileSync(path.join(out, 'f-grabtext.png'), (await go.win.webContents.capturePage()).toPNG());
+    h.startCapture('shot'); // close
+    gw.destroy();
+    await wait(600);
+
     // ---------- 2. searchable history ----------
     const entry = h.addHistory({ type: 'image', buf: timg.toPNG(), ext: 'png', w: 700, h: 260 });
     await until(() => typeof h.findEntry(entry.id).text === 'string', 15000);

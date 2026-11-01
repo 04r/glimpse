@@ -31,6 +31,7 @@ const TOOLS = [
   { id: 'text', key: 'T', tip: 'Text' },
   { id: 'blur', key: 'B', tip: 'Pixelate (hide info)' },
   { id: 'step', key: 'N', tip: 'Numbered step' },
+  { id: 'ocr', key: 'X', tip: 'Grab text: drag over any text to copy it' },
 ];
 const SHARE = [
   { id: 'twitter', label: 'X / Twitter', c: '#e7e9ea' },
@@ -155,6 +156,7 @@ function resetState() {
   selEl.classList.remove('drawing');
   snapEl.hidden = true;
   snap = null;
+  if (typeof closeOcrPanel === 'function' && ocrPanel) closeOcrPanel(true);
   document.body.classList.remove('has-sel', 'dragging', 'has-snap');
   document.body.style.cursor = 'crosshair';
   ax.setTransform(1, 0, 0, 1, 0, 0);
@@ -208,12 +210,12 @@ function buildToolbars() {
   tv.innerHTML = '';
   th.innerHTML = '';
   if (mode === 'shot') {
-    const groups = [['pen', 'line', 'arrow', 'rect', 'ellipse', 'marker'], ['text', 'step', 'blur']];
+    const groups = [['pen', 'line', 'arrow', 'rect', 'ellipse', 'marker'], ['text', 'step', 'blur'], ['ocr']];
     groups.forEach((g, i) => {
       if (i) tv.append(sep());
       for (const id of g) {
         const t = TOOLS.find((x) => x.id === id);
-        btns[id] = button(ICONS[id], t.tip, t.key, () => setTool(id));
+        btns[id] = button(id === 'ocr' ? ICONS.scanText : ICONS[id], t.tip, id === 'ocr' ? 'X' : t.key, () => setTool(id));
         tv.append(btns[id]);
       }
     });
@@ -230,7 +232,6 @@ function buildToolbars() {
       button(ICONS.search, 'Find similar images on Google', 'Ctrl+F', () => act('search')),
       button(ICONS.print, 'Print', 'Ctrl+P', () => act('print')),
       sep(),
-      button(ICONS.scanText, 'Copy the text in this area', 'Ctrl+T', () => act('ocr')),
       button(ICONS.sparkles, 'Make it pretty', 'Ctrl+B', () => act('pretty')),
       sep(),
       button(ICONS.scroll, 'Scrolling capture: scrolls and stitches a long page', 'Ctrl+L', () => startScroll()),
@@ -339,9 +340,102 @@ function updateUndo() {
 function setTool(id) {
   commitText();
   tool = tool === id ? null : id;
-  for (const t of TOOLS) btns[t.id].classList.toggle('on', t.id === tool);
+  for (const t of TOOLS) if (btns[t.id]) btns[t.id].classList.toggle('on', t.id === tool);
+  if (tool === 'ocr') {
+    api.send('ocr:warm');
+    showBubble('Drag over any text to copy it');
+  } else {
+    closeOcrPanel(true);
+  }
   updateCursor(mouse.x, mouse.y);
 }
+
+// ---------- grab text: drag over any text on the frozen screen, it's copied, the overlay stays ----------
+
+const NL = String.fromCharCode(10);
+const ocrBoxEl = document.getElementById('ocrbox');
+const ocrPanel = document.getElementById('ocrpanel');
+const ocrText = document.getElementById('ocrtext');
+const ocrStatus = document.getElementById('ocrstatus');
+let ocrBox = null;
+let ocrJob = 0;
+
+function drawOcrBox() {
+  ocrBoxEl.hidden = !ocrBox;
+  if (!ocrBox) return;
+  ocrBoxEl.style.left = ocrBox.x + 'px';
+  ocrBoxEl.style.top = ocrBox.y + 'px';
+  ocrBoxEl.style.width = ocrBox.w + 'px';
+  ocrBoxEl.style.height = ocrBox.h + 'px';
+}
+
+function closeOcrPanel(clearBox) {
+  ocrJob++;
+  ocrPanel.hidden = true;
+  ocrPanel.classList.remove('busy');
+  if (clearBox) {
+    ocrBox = null;
+    drawOcrBox();
+  }
+}
+
+function placeOcrPanel() {
+  ocrPanel.hidden = false;
+  const a = screenAt(ocrBox.x + ocrBox.w / 2, ocrBox.y + ocrBox.h / 2);
+  const pw = ocrPanel.offsetWidth, ph = ocrPanel.offsetHeight;
+  let x = clamp(ocrBox.x, a.x + 8, a.x + a.w - pw - 8);
+  let y = ocrBox.y + ocrBox.h + 10;
+  if (y + ph > a.y + a.h - 8) y = ocrBox.y - ph - 10;
+  if (y < a.y + 8) y = clamp(ocrBox.y + 10, a.y + 8, a.y + a.h - ph - 8);
+  ocrPanel.style.left = x + 'px';
+  ocrPanel.style.top = y + 'px';
+}
+
+async function finishOcr() {
+  document.body.classList.remove('dragging');
+  if (!ocrBox || ocrBox.w < 8 || ocrBox.h < 8) {
+    ocrBox = null;
+    drawOcrBox();
+    return;
+  }
+  const job = ++ocrJob;
+  const r = {
+    x: Math.round(ocrBox.x * S), y: Math.round(ocrBox.y * S),
+    w: Math.max(1, Math.round(ocrBox.w * S)), h: Math.max(1, Math.round(ocrBox.h * S)),
+  };
+  const c = document.createElement('canvas');
+  c.width = r.w;
+  c.height = r.h;
+  c.getContext('2d').drawImage(bg, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+  ocrText.value = '';
+  ocrStatus.textContent = 'Reading text…';
+  ocrPanel.classList.add('busy');
+  placeOcrPanel();
+  const blob = await new Promise((res) => c.toBlob(res, 'image/png'));
+  const png = new Uint8Array(await blob.arrayBuffer());
+  const res = await api.invoke('ocr:region', { png });
+  if (job !== ocrJob) return;
+  ocrPanel.classList.remove('busy');
+  const lines = (res && res.lines) || [];
+  if (res && res.error) {
+    ocrStatus.textContent = 'Couldn’t read text: ' + res.error;
+  } else if (!lines.length) {
+    ocrStatus.textContent = 'No text found here. Try a bigger area.';
+  } else {
+    ocrText.value = lines.join(NL);
+    ocrStatus.textContent = lines.length === 1 ? 'Copied' : `Copied ${lines.length} lines`;
+  }
+  ocrText.rows = Math.min(8, Math.max(2, lines.length));
+  placeOcrPanel();
+}
+
+document.getElementById('ocrcopy').addEventListener('click', async () => {
+  const t = ocrText.selectionStart !== ocrText.selectionEnd ? ocrText.value.slice(ocrText.selectionStart, ocrText.selectionEnd) : ocrText.value;
+  if (!t) return;
+  await navigator.clipboard.writeText(t).catch(() => {});
+  ocrStatus.textContent = t === ocrText.value ? 'Copied' : 'Copied the selected part';
+});
+document.getElementById('ocrclose').addEventListener('click', () => closeOcrPanel(true));
 
 function placePop(pop, anchor, prefer = 'left') {
   pop.hidden = false;
@@ -563,6 +657,7 @@ function updateCursor(x, y) {
   let c = 'crosshair';
   const h = hitHandle(x, y);
   if (h) c = CURSORS[h];
+  else if (tool === 'ocr') c = 'text';
   else if (inSel(x, y)) c = tool ? (tool === 'text' ? 'text' : 'crosshair') : 'move';
   else if (tool && sel) c = 'default';
   document.body.style.cursor = c;
@@ -623,7 +718,7 @@ function updateLoupe() {
 addEventListener('contextmenu', (e) => e.preventDefault());
 
 addEventListener('mousedown', (e) => {
-  if (e.target.closest('.toolbar, .pop, #textedit')) return;
+  if (e.target.closest('.toolbar, .pop, #textedit, #ocrpanel')) return;
   hidePops();
   if (e.button === 2) return onRightClick();
   if (e.button !== 0) return;
@@ -631,6 +726,15 @@ addEventListener('mousedown', (e) => {
   if (textState) {
     commitText();
     if (tool !== 'text') return;
+  }
+  if (tool === 'ocr') {
+    if (!hasImage) return;
+    drag = { type: 'ocr', ox: x, oy: y };
+    ocrBox = { x, y, w: 0, h: 0 };
+    closeOcrPanel();
+    drawOcrBox();
+    document.body.classList.add('dragging');
+    return;
   }
   const h = hitHandle(x, y);
   if (h) {
@@ -683,6 +787,11 @@ addEventListener('mousemove', (e) => {
     } else if (drag.type === 'draw') {
       updateShape(x, y, e.shiftKey);
       renderAnn();
+    } else if (drag.type === 'ocr') {
+      ocrBox = norm(drag.ox, drag.oy, x, y);
+      drawOcrBox();
+      updateLoupe();
+      return;
     }
     update();
   } else {
@@ -699,6 +808,7 @@ addEventListener('mouseup', () => {
   drag = null;
   document.body.classList.remove('dragging');
   if (d.type === 'draw') finishShape();
+  if (d.type === 'ocr') return void finishOcr();
   // a click without dragging captures the window under the cursor
   if (d.type === 'new' && sel && (sel.w < 3 || sel.h < 3)) sel = d.snap ? { ...d.snap } : null;
   update();
@@ -751,6 +861,13 @@ function onRightClick() {
 // ---------- keyboard ----------
 
 addEventListener('keydown', (e) => {
+  if (e.target === ocrText) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeOcrPanel(true);
+    }
+    return;
+  }
   if (e.target === textEdit) {
     if (e.key === 'Escape') {
       cancelText();
@@ -768,6 +885,8 @@ addEventListener('keydown', (e) => {
   if (k === 'Escape') {
     e.preventDefault();
     if (!palette.hidden || !shareMenu.hidden) return hidePops();
+    if (!ocrPanel.hidden || !ocrBoxEl.hidden) return closeOcrPanel(true);
+    if (tool === 'ocr') return setTool('ocr');
     return close();
   }
   if (ctrl && lower === 'a') {
@@ -817,7 +936,7 @@ addEventListener('keydown', (e) => {
       p: () => act('print'),
       f: () => act('search'),
       g: () => startRec('gif'),
-      t: () => act('ocr'),
+      t: () => setTool('ocr'),
       b: () => act('pretty'),
       l: () => startScroll(),
       r: () => startRec('video'),
