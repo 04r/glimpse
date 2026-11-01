@@ -31,6 +31,7 @@
     <p>Screenshots and GIFs,<br>one key away.</p>
     <div class="keys"><span class="k">PrtSc</span> capture <span style="width:14px"></span><span class="k">Ctrl</span><span class="k">PrtSc</span> GIF</div>
   </div>
-  <div class="shot"><img src="../docs/screenshot-overlay.png"></div>
+  <div class="shot"><img id="shot"></div>
+  <script>document.getElementById("shot").src = new URLSearchParams(location.search).get("shot") || "";</script>
 </body>
 </html>

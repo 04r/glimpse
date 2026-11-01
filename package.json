@@ -8,9 +8,20 @@
     "start": "electron .",
     "selftest": "electron . --selftest",
     "speedtest": "electron . --speedtest",
-    "docs": "electron . --docs"
+    "docs": "electron . --docs",
+    "dist": "electron-builder --win nsis --x64",
+    "assets": "electron tools/make-assets.js"
   },
-  "keywords": ["screenshot", "screen-capture", "gif", "screen-recorder", "lightshot", "gyazo", "windows", "electron"],
+  "keywords": [
+    "screenshot",
+    "screen-capture",
+    "gif",
+    "screen-recorder",
+    "lightshot",
+    "gyazo",
+    "windows",
+    "electron"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/04r/glimpse.git"
@@ -19,11 +30,76 @@
   "devDependencies": {
     "@fontsource/barlow": "^5.3.0",
     "@fontsource/barlow-semi-condensed": "^5.3.0",
-    "electron": "^45.2.1"
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
   },
   "dependencies": {
     "ffmpeg-static": "^5.3.0",
     "koffi": "^3.3.6",
     "node-screenshots": "^0.2.8"
+  },
+  "allowScripts": {
+    "koffi@3.3.6": true,
+    "ffmpeg-static@5.3.0": true
+  },
+  "author": {
+    "name": "04r",
+    "url": "https://github.com/04r"
+  },
+  "homepage": "https://github.com/04r/glimpse",
+  "build": {
+    "appId": "app.glimpse",
+    "productName": "Glimpse",
+    "copyright": "Copyright © 2026 04r",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!src/review.js",
+      "!src/docs.js"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "**/*.node"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Glimpse-Setup-${version}.${ext}",
+      "legalTrademarks": "Glimpse"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Glimpse",
+      "menuCategory": false,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "license": "LICENSE",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "uninstallDisplayName": "Glimpse ${version}"
+    },
+    "electronLanguages": [
+      "en-US"
+    ]
   }
 }

@@ -32,7 +32,9 @@ function seed(userData) {
 }
 
 async function run({ preload, userData }) {
-  const out = path.join(__dirname, '..', 'docs');
+  // all screenshots land in a temp folder (handy for posts); only the banner goes into the repo
+  const out = process.env.GLIMPSE_DOCS_OUT || path.join(app.getPath('temp'), 'glimpse-screenshots');
+  const repoDocs = path.join(__dirname, '..', 'docs');
   const tmp = path.join(app.getPath('temp'), 'glimpse-docs-tmp');
   fs.mkdirSync(out, { recursive: true });
   fs.mkdirSync(tmp, { recursive: true });
@@ -160,9 +162,11 @@ async function run({ preload, userData }) {
       b.destroy();
     }
     // banner (README header and GitHub social preview)
-    const ban = await win(path.join(__dirname, '..', 'tools', 'banner.html'), 1280, 640);
+    const ban = await win(path.join(__dirname, '..', 'tools', 'banner.html'), 1280, 640, { query: { shot: pathToFileURL(path.join(out, 'screenshot-overlay.png')).href } });
     await wait(800);
-    await save(ban, 'banner.png');
+    await wait(400);
+    fs.writeFileSync(path.join(repoDocs, 'banner.png'), (await grab(ban)).toPNG());
+    log('saved banner.png to docs/, other screenshots in', out);
     ban.destroy();
     log('DONE');
   } catch (e) {

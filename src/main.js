@@ -1097,6 +1097,13 @@ if (!app.requestSingleInstanceLock()) {
       setTimeout(checkSnippingKey, 5000);
     }
 
+    // first launch after installing: show the dashboard once, so it's clear Glimpse is running
+    if (app.isPackaged && !settings.welcomed && !QUIET) {
+      settings.welcomed = true;
+      store.saveSettings(settings);
+      openDashboard();
+    }
+
     if (process.argv.includes('--capture')) startCapture('shot');
     if (REVIEW) require('./review')({ preload: PRELOAD });
     if (DOCS) require('./docs').run({ preload: PRELOAD, userData: app.getPath('userData') });
