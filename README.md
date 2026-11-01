@@ -33,7 +33,7 @@ You can change all of them in Settings. In the overlay, hover any button to see 
 
 ## Install
 
-Download `Glimpse-Setup.exe` from [Releases](https://github.com/04r/glimpse/releases/latest) and run it. Windows 10 and 11 are supported.
+Download the installer (`Glimpse-Setup-<version>.exe`) from [Releases](https://github.com/04r/glimpse/releases/latest) and run it. Windows 10 and 11 are supported.
 
 The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC". Click **More info**, then **Run anyway**.
 
