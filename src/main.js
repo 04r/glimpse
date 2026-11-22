@@ -14,6 +14,10 @@ const ocr = require('./ocr');
 const native = require('./native');
 const scrollMod = require('./scroll');
 const { iconPNG } = require('./icon');
+const clipsModule = require('./clips');
+
+// lets the clip player switch between a clip's sound tracks
+app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks');
 
 // --review renders the screens offscreen for design checks; it must not pop anything on the desktop.
 const REVIEW = process.argv.includes('--review');
@@ -22,8 +26,9 @@ const DOCS = process.argv.includes('--docs');
 // test modes stay quiet: no toasts, no global hotkeys (the user's own Glimpse owns them)
 const MULTI = process.argv.includes('--multitest');
 const FEAT = process.argv.includes('--featuretest');
-const QUIET = REVIEW || DOCS || MULTI || FEAT || process.argv.includes('--speedtest');
-if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW || MULTI || FEAT) {
+const CLIPSTEST = process.argv.includes('--clipstest');
+const QUIET = REVIEW || DOCS || MULTI || FEAT || CLIPSTEST || process.argv.includes('--speedtest');
+if (process.argv.includes('--selftest') || process.argv.includes('--speedtest') || REVIEW || MULTI || FEAT || CLIPSTEST) {
   app.setPath('userData', path.join(app.getPath('temp'), 'glimpse-selftest'));
 }
 if (DOCS) {
@@ -82,6 +87,7 @@ let settingsWin = null;
 let historyWin = null;
 let dashWin = null;
 let pendingDisplaySource = null;
+let clips = null; // instant replay + clip library (src/clips.js)
 
 // ---------- helpers ----------
 
@@ -134,14 +140,15 @@ function copyFileToClipboard(file) {
 
 function toast(title, sub = '', opts = {}) {
   if (QUIET) return;
-  const { kind = 'info', sticky = false, action = null } = opts;
+  const { kind = 'info', sticky = false, action = null, sound = false } = opts;
   toastAction = action;
   const W = 400, H = 82;
   const disp = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const wa = disp.workArea;
   const bounds = { x: wa.x + wa.width - W - 12, y: wa.y + wa.height - H - 12, width: W, height: H };
-  const actionLabel = !action ? '' : action.url ? 'Open link' : action.file ? 'Show file' : action.open ? 'Open' : action.openDashboard ? 'Open Glimpse' : 'Open settings';
-  const payload = { title, sub, kind, clickable: !!action, actionLabel };
+  const actionLabel = !action ? '' : action.url ? 'Open link' : action.file ? 'Show file' : action.open ? 'Open' : action.openDashboard ? 'Open Glimpse'
+    : action.openClipFile ? 'Watch' : action.openClips ? 'Open Clips' : 'Open settings';
+  const payload = { title, sub, kind, clickable: !!action, actionLabel, sound };
   if (!toastWin || toastWin.isDestroyed()) {
     toastWin = new BrowserWindow({
       ...bounds, frame: false, transparent: true, resizable: false, skipTaskbar: true,
@@ -180,6 +187,8 @@ ipcMain.on('toast:click', () => {
   else if (a.settingsUri) shell.openExternal(a.settingsUri);
   else if (a.openSettings) openSettings();
   else if (a.openDashboard) openDashboard();
+  else if (a.openClips) clips && clips.open();
+  else if (a.openClipFile) clips && clips.open('play:' + a.openClipFile);
 });
 ipcMain.on('toast:hover', (_e, hovering) => {
   clearTimeout(toastTimer);
@@ -828,7 +837,6 @@ async function runScrollCapture(d, rect) {
   const abs = { x: d.bounds.x + rect.x, y: d.bounds.y + rect.y, width: rect.width, height: rect.height };
   const center = screen.dipToScreenPoint({ x: Math.round(abs.x + abs.width / 2), y: Math.round(abs.y + abs.height / 2) });
   const before = native.cursorPos();
-  const notches = Math.max(1, Math.min(5, Math.floor(ph / 260)));
 
   // yellow frame around the area (kept out of the grabs), like the recording frame
   const B = 4;
@@ -847,6 +855,7 @@ async function runScrollCapture(d, rect) {
   frame.showInactive();
 
   scrolling = { stop: false };
+  let manualMode = false;
   const stopKey = () => scrolling && (scrolling.stop = true);
   try {
     globalShortcut.register('Escape', stopKey);
@@ -855,12 +864,18 @@ async function runScrollCapture(d, rect) {
   try {
     const res = await scrollMod.scrollCapture({
       grab: grabArea,
-      scroll: () => {
+      scroll: (n) => {
         native.setCursorPos(center.x, center.y);
-        native.wheel(-120 * notches);
+        native.wheel(-120 * n);
       },
+      notches: Math.max(1, Math.min(4, Math.round(ph / 400))),
       stopped: () => scrolling.stop,
-      onStep: (n, rows) => toast('Scrolling capture…', `${rows} px so far. Press Esc to stop`, { sticky: true }),
+      onStep: (n, rows) => toast(manualMode ? 'Scroll down yourself…' : 'Scrolling capture…', `${rows} px so far. Press Esc to finish`, { sticky: true }),
+      onManual: () => {
+        manualMode = true;
+        if (before) native.setCursorPos(before.x, before.y);
+        toast('Scroll down yourself', 'This app ignores automatic scrolling. Scroll at your own pace, then press Esc to finish', { sticky: true });
+      },
     });
     const png = rawToPNG({ width: res.w, height: res.h, data: res.data, rgba: true });
     const entry = addHistory({ type: 'image', buf: png, ext: 'png', w: res.w, h: res.h });
@@ -1126,6 +1141,7 @@ ipcMain.on('dash:capture', async (_e, mode) => {
 });
 ipcMain.on('open:settings', () => openSettings());
 ipcMain.on('open:history', () => openHistory());
+ipcMain.handle('dash:replay', () => (clips ? clips.status() : null));
 
 function openHistory() {
   if (historyWin && !historyWin.isDestroyed()) {
@@ -1270,6 +1286,11 @@ const HOTKEY_ACTIONS = {
   fullscreen: () => fullscreenShot(),
   gif: () => startCapture('gif'),
   video: () => startCapture('video'),
+  clipSave: () => clips && clips.saveFull(),
+  clipShort: () => clips && clips.saveShort(),
+  clipToggle: () => clips && clips.toggle(),
+  micMute: () => clips && clips.toggleMic(),
+  recordToggle: () => clips && clips.toggleRecording(),
 };
 
 function registerHotkeys() {
@@ -1300,6 +1321,14 @@ function buildTrayMenu() {
       { label: 'Record GIF', click: () => startCapture('gif'), ...hk('gif') },
       { label: 'Record video', click: () => startCapture('video'), ...hk('video') },
       { label: 'Stop recording', click: () => stopRecording(), visible: !!rec },
+      { type: 'separator' },
+      {
+        label: clips && clips.status().state === 'error' ? 'Instant replay (stopped, see Clips)' : 'Instant replay', type: 'checkbox',
+        checked: !!(clips && clips.isOn()), click: () => clips && clips.toggle(), ...hk('clipToggle'),
+      },
+      { label: 'Save clip', click: () => clips && clips.saveFull(), enabled: !!(clips && clips.status().state === 'on'), ...hk('clipSave') },
+      { label: clips && clips.isRecording() ? 'Stop full recording' : 'Start full recording', click: () => clips && clips.toggleRecording(), ...hk('recordToggle') },
+      { label: 'Clips', click: () => clips && clips.open() },
       { type: 'separator' },
       { label: 'Captures', click: openHistory },
       { label: 'Open save folder', click: () => shell.openPath(ensureSaveDir()) },
@@ -1372,8 +1401,32 @@ if (!app.requestSingleInstanceLock()) {
       lastDouble = Date.now();
       openDashboard();
     });
+    clips = clipsModule({
+      getSettings: () => settings,
+      saveSettings: (s) => {
+        settings = s;
+        store.saveSettings(s);
+      },
+      toast, webPrefs, UI, noAnim, native, appIcon: () => appIcon, ffmpegBin: () => ff.bin(),
+      onHotkeysChanged: () => registerHotkeys(), buildTrayMenu: () => buildTrayMenu(),
+      copyFileToClipboard,
+      uploadFile: async (file) => {
+        const size = fs.statSync(file).size;
+        if (size > 200 * 1048576) return toast('Too big to upload', 'Uploads are limited to 200 MB. Use Export, Small file first', { kind: 'error' });
+        toast('Uploading…', `${(size / 1048576).toFixed(1)} MB`, { sticky: true });
+        try {
+          const url = await upload(file, settings.uploadHost);
+          await copyTextToClipboard(url);
+          toast('Link copied', url, { kind: 'success', action: { url } });
+          return url;
+        } catch (err) {
+          toast('Upload failed', err.message, { kind: 'error' });
+        }
+      },
+    });
     buildTrayMenu();
     applyLoginItem();
+    if (!QUIET) clips.boot();
 
     buildOverlays();
     for (const ev of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(ev, scheduleRebuild);
@@ -1385,10 +1438,10 @@ if (!app.requestSingleInstanceLock()) {
     if (process.argv.includes('--selftest')) console.log('[selftest] hotkeys failed:', JSON.stringify(failed));
     const shot = settings.hotkeys.screenshot || 'the tray icon';
     if (failed.length) {
-      const names = { screenshot: 'Capture area', fullscreen: 'Capture screen', gif: 'Record GIF', video: 'Record video' };
+      const names = { screenshot: 'Capture area', fullscreen: 'Capture screen', gif: 'Record GIF', video: 'Record video', clipSave: 'Save clip', clipShort: 'Save short clip', clipToggle: 'Instant replay on/off', recordToggle: 'Start/stop recording', micMute: 'Mute mic in clips' };
       toast('Another app uses some hotkeys', `Pick new keys for: ${failed.map((f) => names[f] || f).join(', ')}`, {
         kind: 'error',
-        action: { openSettings: true },
+        action: failed.some((f) => /^clip|^mic/.test(f)) ? { openClips: true } : { openSettings: true },
       });
     } else {
       const pk = (k) => (k || '').replace('PrintScreen', 'PrtSc');
@@ -1413,9 +1466,10 @@ if (!app.requestSingleInstanceLock()) {
     if (FEAT) {
       require('./featuretest')({
         ocr, addHistory, findEntry: (id) => history.find((x) => x.id === id), openHistory, getHistoryWin: () => historyWin,
-        startCapture, overlays, runScrollCapture, openPretty,
+        startCapture, overlays, runScrollCapture, openPretty, stopScroll: () => scrolling && (scrolling.stop = true),
       });
     }
+    if (CLIPSTEST) require('./clipstest')({ clips, getSettings: () => settings, saveSettings: (s) => ((settings = s), store.saveSettings(s)), ffmpegBin: () => ff.bin() });
     if (process.argv.includes('--speedtest')) require('./speedtest')({ startCapture, overlays, timings });
     if (process.argv.includes('--selftest')) {
       require('./selftest')({

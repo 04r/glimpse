@@ -28,34 +28,99 @@ module.exports = async (h) => {
     return w;
   };
 
-  async function scrollPart() {
-    const rows = Array.from({ length: 36 }, (_, i) =>
-      `<div style="height:90px;display:flex;align-items:center;padding-left:28px;font:600 30px Segoe UI;background:${i % 2 ? '#eef2f7' : '#ffffff'};color:#15181d">Row ${i + 1} of 36</div>`
-    ).join('');
-    const sw = page(`<body style="margin:0;overflow-y:scroll"><div style="position:sticky;top:0;height:70px;background:#1c2027;color:#ffd23f;font:700 28px Segoe UI;display:flex;align-items:center;padding-left:28px">Sticky header</div>${rows}</body>`,
-      { x: 300, y: 150, width: 720, height: 600, useContentSize: true, alwaysOnTop: true });
+  async function scrollCase(name, html, opts, check) {
+    const sw = opts && opts.url
+      ? new BrowserWindow({ show: false, frame: false, x: 300, y: 150, width: 900, height: 700, useContentSize: true, alwaysOnTop: true })
+      : page(html, { x: 300, y: 150, width: 720, height: 600, useContentSize: true, alwaysOnTop: true, ...opts });
+    if (opts && opts.url) sw.loadURL(opts.url);
     await new Promise((r) => sw.webContents.once('did-finish-load', r));
     sw.showInactive();
-    await wait(700);
+    await wait(opts && opts.loadWait || 700);
     const d = screen.getDisplayNearestPoint({ x: 400, y: 300 });
     const b = sw.getContentBounds();
     const t1 = Date.now();
     const shot = await h.runScrollCapture(d, { x: b.x - d.bounds.x, y: b.y - d.bounds.y, width: b.width, height: b.height });
+    const full = await sw.webContents.executeJavaScript('Math.max(document.documentElement.scrollHeight, ...[...document.querySelectorAll("*")].map((e) => e.scrollHeight))').catch(() => 0);
     sw.destroy();
     const sres = nativeImage.createFromPath(shot.file);
     const sz = sres.getSize();
-    log('scroll', Date.now() - t1, 'ms, result', sz.width, 'x', sz.height);
-    fs.copyFileSync(shot.file, path.join(out, 'f-scroll.png'));
-    // the page is 70 + 36 x 90 = 3310 px tall
-    expect(Math.abs(sz.height - 3310) <= 30, `stitched image is the full page height (${sz.height} vs 3310)`);
-    const stext = (await h.ocr.ocrImage(sres)).join('\n');
-    const headers = (stext.match(/Sticky header/g) || []).length;
-    expect(/Row 1 of 36/.test(stext) && /Row 36 of 36/.test(stext), 'contains the first and the last row');
-    expect(headers === 1, `the sticky header appears once, not repeated (${headers})`);
-    const missing = Array.from({ length: 36 }, (_, i) => i + 1).filter((n) => !new RegExp(`Row ${n} of`).test(stext));
-    expect(missing.length <= 2, `every row made it in (missing: ${missing.join(',') || 'none'})`);
-
+    log('scroll', name, Date.now() - t1, 'ms, result', sz.width, 'x', sz.height, 'page', full);
+    fs.copyFileSync(shot.file, path.join(out, `f-scroll-${name}.png`));
+    await check(sres, sz, full);
   }
+
+  async function scrollPart() {
+    // 1. plain list with a sticky header
+    const rows = Array.from({ length: 36 }, (_, i) =>
+      `<div style="height:90px;display:flex;align-items:center;padding-left:28px;font:600 30px Segoe UI;background:${i % 2 ? '#eef2f7' : '#ffffff'};color:#15181d">Row ${i + 1} of 36</div>`
+    ).join('');
+    await scrollCase('list', `<body style="margin:0;overflow-y:scroll"><div style="position:sticky;top:0;height:70px;background:#1c2027;color:#ffd23f;font:700 28px Segoe UI;display:flex;align-items:center;padding-left:28px">Sticky header</div>${rows}</body>`, {}, async (sres, sz) => {
+      // the page is 70 + 36 x 90 = 3310 px tall
+      expect(Math.abs(sz.height - 3310) <= 30, `list: stitched image is the full page height (${sz.height} vs 3310)`);
+      const stext = (await h.ocr.ocrImage(sres)).join('\n');
+      const headers = (stext.match(/Sticky header/g) || []).length;
+      expect(headers === 1, `list: the sticky header appears once (${headers})`);
+      const missing = Array.from({ length: 36 }, (_, i) => i + 1).filter((n) => !new RegExp(`Row ${n} of`).test(stext));
+      expect(missing.length <= 2, `list: every row made it in (missing: ${missing.join(',') || 'none'})`);
+    });
+
+    // 2. a messy article: hover highlights under the cursor, an endless animation, pictures,
+    //    a sticky footer bar, uneven text
+    const words = 'glimpse captures every pixel while the page keeps moving smoothly under a busy cursor and shiny effects'.split(' ');
+    const para = (i) => Array.from({ length: 18 + (i * 7) % 23 }, (_, k) => words[(i * 3 + k) % words.length]).join(' ');
+    const blocks = Array.from({ length: 30 }, (_, i) => (i % 5 === 3
+      ? `<div class="pic" style="background:linear-gradient(${i * 37}deg,#${(0x335577 + i * 0x1a2b3).toString(16).slice(-6)},#ffd23f)">Figure ${i + 1}</div>`
+      : `<p class="hov"><b>Paragraph ${i + 1}.</b> ${para(i)}</p>`)).join('');
+    const css = `body{margin:0;font:17px/1.55 Georgia,serif;color:#222;background:#fafafa;overflow-y:scroll}
+      .hov{margin:0;padding:12px 26px}.hov:hover{background:#fff2b8}
+      .pic{height:220px;margin:10px 26px;border-radius:12px;display:flex;align-items:end;padding:12px;color:#fff;font:700 22px Segoe UI}
+      header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ddd;padding:14px 26px;font:700 20px Segoe UI;display:flex;gap:16px;align-items:center}
+      .spin{width:22px;height:22px;border:3px solid #ccc;border-top-color:#2f6bff;border-radius:50%;animation:r .8s linear infinite}
+      @keyframes r{to{transform:rotate(360deg)}}
+      footer{position:sticky;bottom:0;background:#1c2027;color:#fff;padding:12px 26px;font:600 15px Segoe UI}`;
+    await scrollCase('article', `<style>${css}</style><header><div class="spin"></div>Messy article</header>${blocks}<footer>Sticky footer bar - Glimpse test</footer>`, {}, async (sres, sz, full) => {
+      expect(sz.height >= full - 60 && sz.height <= full + 120, `article: full page height (${sz.height} vs page ${full})`);
+      const stext = (await h.ocr.ocrImage(sres)).join('\n');
+      const nums = Array.from({ length: 30 }, (_, i) => i + 1).filter((n) => n % 5 !== 4);
+      const missing = nums.filter((n) => !new RegExp(`Paragraph ${n}\.`).test(stext));
+      expect(missing.length <= 2, `article: every paragraph made it in (missing: ${missing.join(',') || 'none'})`);
+      const foot = (stext.match(/Sticky footer/g) || []).length, head = (stext.match(/Messy article/g) || []).length;
+      expect(foot === 1 && head === 1, `article: header and footer bars appear once (${head}, ${foot})`);
+    });
+
+    // a real web page (only when asked: needs the internet), checked by eye
+    if (process.env.GLIMPSE_SCROLL_WEB) {
+      setTimeout(() => h.stopScroll(), 25000);
+      await scrollCase('web', '', { url: process.env.GLIMPSE_SCROLL_WEB, loadWait: 3500 }, async (_s, sz, full) => log('web result', sz.width, sz.height, 'page', full));
+    }
+
+    // 4. an app that ignores the wheel: Glimpse switches to "scroll it yourself"; here the page scrolls
+    //    itself a bit at a time, like a person would, and the test presses Esc when it's done
+    const mrows = Array.from({ length: 30 }, (_, i) => `<div style="height:70px;border-bottom:1px solid #ddd;padding:0 24px;display:flex;align-items:center;font:600 24px Segoe UI;background:${i % 3 ? '#fff' : '#f3f6fb'}">Entry ${i + 1} - by hand</div>`).join('');
+    setTimeout(() => h.stopScroll(), 16000);
+    await scrollCase('manual', `<body style="margin:0;overflow:hidden"><div id="s" style="height:100vh;overflow-y:hidden">${mrows}</div><script>
+      const s = document.getElementById('s');
+      addEventListener('wheel', (e) => e.preventDefault(), { passive: false });
+      setTimeout(() => { const t = setInterval(() => { s.scrollTop += 90 + Math.round(Math.random() * 160); if (s.scrollTop + s.clientHeight >= s.scrollHeight) clearInterval(t); }, 700); }, 2500);
+      </script></body>`, {}, async (sres, sz) => {
+      expect(Math.abs(sz.height - 30 * 71) <= 40, `manual: full height when scrolled by hand (${sz.height} vs ${30 * 71})`);
+      const stext = (await h.ocr.ocrImage(sres)).join('\n');
+      const missing = Array.from({ length: 30 }, (_, i) => i + 1).filter((n) => !stext.split('\n').some((l) => l.includes(`ntry ${n} `) || l.trim().endsWith(`ntry ${n}`)));
+      expect(missing.length <= 2, `manual: every entry made it in (missing: ${missing.join(',') || 'none'})`);
+    });
+
+    // 3. a page that jumps a whole screen per wheel notch (forces smaller steps)
+    const jrows = Array.from({ length: 40 }, (_, i) => `<div style="height:64px;border-bottom:1px solid #ddd;padding:0 24px;display:flex;align-items:center;font:600 24px Segoe UI">Item ${i + 1} - jumpy list</div>`).join('');
+    await scrollCase('jumpy', `<body style="margin:0;overflow:hidden"><div id="s" style="height:100vh;overflow-y:scroll">${jrows}</div><script>
+      const s=document.getElementById('s');s.addEventListener('wheel',(e)=>{e.preventDefault();s.scrollTop+=Math.sign(e.deltaY)*Math.round(innerHeight*0.45)*Math.max(1,Math.round(Math.abs(e.deltaY)/100));},{passive:false});</script></body>`, {}, async (sres, sz) => {
+      expect(Math.abs(sz.height - 40 * 65) <= 40, `jumpy: full height despite big jumps (${sz.height} vs ${40 * 65})`);
+      const stext = (await h.ocr.ocrImage(sres)).join('\n');
+      const missing = Array.from({ length: 40 }, (_, i) => i + 1).filter((n) => !stext.split('\n').some((l) => l.trim().endsWith('tem ' + n)));
+      if (missing.length > 2) log('jumpy ocr', JSON.stringify(stext.slice(0, 200)));
+      expect(missing.length <= 2, `jumpy: every item made it in (missing: ${missing.join(',') || 'none'})`);
+    });
+  }
+
 
   // ---------- 5. make it pretty ----------
   async function prettyPart(entry) {
@@ -183,20 +248,23 @@ module.exports = async (h) => {
       'Add-Type -AssemblyName System.Windows.Forms;$f=New-Object Windows.Forms.Form;$f.FormBorderStyle="None";' +
       '$f.StartPosition="Manual";$f.Left=320;$f.Top=210;$f.Width=640;$f.Height=380;$f.TopMost=$true;$f.ShowInTaskbar=$false;' +
       '$f.BackColor=[Drawing.Color]::FromArgb(47,107,255);[Windows.Forms.Application]::Run($f)']);
-    await wait(2500);
+    await wait(4500); // PowerShell can be slow to show the form
     h.startCapture('shot');
     await until(() => [...h.overlays.values()].every((o) => o.ready));
     const o = [...h.overlays.values()][0];
     const js = (c) => o.win.webContents.executeJavaScript(c);
+    // the overlay may span several screens (it starts at the leftmost one), so work in its own coordinates
+    const sob = o.win.getBounds();
+    const cx = 600 - sob.x, cy = 400 - sob.y;
     const snap = await js(`(() => {
-      window.dispatchEvent(new MouseEvent('mousemove', { clientX: 600, clientY: 400 }));
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: ${cx}, clientY: ${cy} }));
       const hovered = snap && { ...snap };
-      document.body.dispatchEvent(new MouseEvent('mousedown', { clientX: 600, clientY: 400, button: 0, bubbles: true }));
-      document.body.dispatchEvent(new MouseEvent('mouseup', { clientX: 600, clientY: 400, button: 0, bubbles: true }));
+      document.body.dispatchEvent(new MouseEvent('mousedown', { clientX: ${cx}, clientY: ${cy}, button: 0, bubbles: true }));
+      document.body.dispatchEvent(new MouseEvent('mouseup', { clientX: ${cx}, clientY: ${cy}, button: 0, bubbles: true }));
       return { hovered, sel, wins: wins.length };
     })()`);
-    log('snap', JSON.stringify(snap));
-    const near = (r) => r && Math.abs(r.x - 320) <= 2 && Math.abs(r.y - 210) <= 2 && Math.abs(r.w - 640) <= 3 && Math.abs(r.h - 380) <= 3;
+    log('snap', JSON.stringify(snap), 'overlay at', sob.x, sob.y);
+    const near = (r) => r && Math.abs(r.x - (320 - sob.x)) <= 2 && Math.abs(r.y - (210 - sob.y)) <= 2 && Math.abs(r.w - 640) <= 3 && Math.abs(r.h - 380) <= 3;
     expect(near(snap.hovered), 'hovering highlights the window under the cursor');
     expect(near(snap.sel), 'a click without dragging selects exactly that window');
     fs.writeFileSync(path.join(out, 'f-snap.png'), (await o.win.webContents.capturePage()).toPNG());

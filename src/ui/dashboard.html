@@ -36,7 +36,12 @@
     .main-shot .row { display: flex; align-items: center; gap: 12px; margin-top: 6px; color: var(--fog); font-size: 14.5px; }
     .keys { display: inline-flex; gap: 4px; }
 
-    .side { display: grid; grid-template-rows: repeat(3, 1fr); gap: 10px; }
+    .side { display: grid; grid-template-rows: repeat(4, 1fr); gap: 8px; }
+    .act { min-height: 56px; }
+    .act .ic.live { color: var(--tally); }
+    .act .tx > span.on { color: var(--paper); }
+    .act .pill { margin-left: auto; flex: none; height: 22px; padding: 0 8px; border-radius: 11px; font: 700 12px/22px var(--readout); background: var(--well); color: var(--fog); }
+    .act .pill.on { background: var(--tally); color: #fff; }
     .act {
       display: flex; align-items: center; gap: 14px; padding: 0 16px; border: 0; border-radius: 12px; cursor: pointer; text-align: left;
       background: var(--body-2); color: var(--paper); box-shadow: inset 0 0 0 1px var(--edge-soft); min-height: 68px;
@@ -89,6 +94,7 @@
     <div class="side">
       <button class="act" id="gif"><span class="ic rec" id="ic-gif"></span><span class="tx"><b>Record a GIF</b><span id="k-gif"></span></span></button>
       <button class="act" id="video"><span class="ic rec" id="ic-video"></span><span class="tx"><b>Record a video</b><span id="k-video"></span></span></button>
+      <button class="act" id="clips"><span class="ic" id="ic-clips"></span><span class="tx"><b>Clips and instant replay</b><span id="k-clips"></span></span><span class="pill" id="replayPill">Off</span></button>
       <button class="act" id="full"><span class="ic" id="ic-full"></span><span class="tx"><b>Capture the whole screen</b><span id="k-fullscreen"></span></span></button>
     </div>
   </section>

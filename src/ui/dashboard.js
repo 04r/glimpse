@@ -13,6 +13,18 @@ $('shot').onclick = () => api.send('dash:capture', 'shot');
 $('gif').onclick = () => api.send('dash:capture', 'gif');
 $('video').onclick = () => api.send('dash:capture', 'video');
 $('full').onclick = () => api.send('dash:capture', 'fullscreen');
+$('clips').onclick = () => api.send('open:clips');
+$('ic-clips').innerHTML =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg>';
+
+async function loadReplay() {
+  const s = await api.invoke('dash:replay');
+  const on = s && (s.state === 'on' || s.state === 'starting');
+  $('replayPill').textContent = on ? 'Replay on' : s && s.state === 'error' ? 'Stopped' : 'Replay off';
+  $('replayPill').classList.toggle('on', !!on);
+  $('ic-clips').classList.toggle('live', !!on);
+}
+setInterval(loadReplay, 3000);
 $('folder').onclick = () => api.send('open:folder');
 $('settings').onclick = () => api.send('open:settings');
 $('all').onclick = () => api.send('open:history');
@@ -29,6 +41,7 @@ async function loadKeys() {
   const { settings } = await api.invoke('settings:get');
   const hk = settings.hotkeys;
   $('k-screenshot').innerHTML = keycaps(hk.screenshot);
+  $('k-clips').innerHTML = hk.clipSave ? `<span class="keys">${keycaps(hk.clipSave)}</span>&nbsp;saves a clip` : 'Save what just happened';
   for (const id of ['gif', 'video', 'fullscreen']) {
     const el = $('k-' + id);
     el.innerHTML = hk[id] ? `<span class="keys">${keycaps(hk[id])}</span>` : 'No shortcut set';
@@ -91,3 +104,4 @@ api.on('dash:refresh', () => {
 });
 loadKeys();
 loadRecent();
+loadReplay();

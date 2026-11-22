@@ -1,0 +1,373 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data:; media-src 'self' file:">
+  <title>Glimpse Clips</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="clips.css">
+</head>
+<body>
+  <nav>
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="#ffd23f" stroke-width="2.2" stroke-linecap="square"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="2" fill="#ffd23f" stroke="none"/></svg>Clips</div>
+
+    <div class="live" id="live">
+      <div class="live-top">
+        <span class="dot" id="liveDot"></span>
+        <div class="live-tx"><b id="liveTitle">Instant replay</b><small id="liveSub">Off</small></div>
+        <label class="sw"><input type="checkbox" id="liveToggle"><span></span></label>
+      </div>
+      <button class="btn primary save" id="saveNow" disabled><span id="saveIc"></span>Save clip <span class="keys" id="saveKeys"></span></button>
+      <button class="btn recbtn" id="recBtn"><span class="rdot"></span><span id="recTx">Record</span> <span class="keys" id="recKeys"></span></button>
+    </div>
+
+    <a href="#library" data-page="library" class="on"><span class="ni" id="ni-lib"></span>Library</a>
+    <a href="#replay" data-page="replay"><span class="ni" id="ni-rep"></span>Instant replay</a>
+    <a href="#video" data-page="video"><span class="ni" id="ni-vid"></span>Video</a>
+    <a href="#audio" data-page="audio"><span class="ni" id="ni-aud"></span>Audio</a>
+    <a href="#saving" data-page="saving"><span class="ni" id="ni-sav"></span>Saving</a>
+    <div class="grow"></div>
+    <div class="planbox readout" id="planbox"></div>
+  </nav>
+
+  <main>
+    <!-- ================= library ================= -->
+    <section class="page" id="page-library">
+      <header class="bar">
+        <h1>Library</h1>
+        <span class="count readout" id="libCount"></span>
+        <span class="grow"></span>
+        <div class="search"><span id="srchIc"></span><input type="text" id="q" placeholder="Search clips" spellcheck="false"></div>
+        <select id="sort">
+          <option value="new">Newest first</option><option value="old">Oldest first</option>
+          <option value="big">Largest first</option><option value="long">Longest first</option>
+        </select>
+        <button class="btn quiet" id="openFolder"></button>
+      </header>
+      <div class="chips" id="appChips"></div>
+      <div class="grid" id="grid"></div>
+      <div class="empty" id="libEmpty" hidden>
+        <div class="empty-art"><i></i><i></i><i></i><i></i></div>
+        <h2>No clips yet</h2>
+        <p>Turn on <b>Instant replay</b>. Glimpse keeps the last moments of your screen ready, and <span id="emptyKeys"></span> saves them as a clip. Nothing is saved until you press it.</p>
+        <button class="btn primary" id="emptyOn">Turn on instant replay</button>
+      </div>
+    </section>
+
+    <!-- ================= player / trimmer ================= -->
+    <section class="page" id="page-player" hidden>
+      <header class="bar">
+        <button class="btn quiet" id="back"></button>
+        <div class="ptitle"><input type="text" id="pName" spellcheck="false"><small class="readout" id="pMeta"></small></div>
+        <span class="grow"></span>
+        <button class="btn icon quiet" id="pFolder" title="Show in folder"></button>
+        <button class="btn icon quiet danger" id="pDelete" title="Delete (moves it to the Recycle Bin)"></button>
+      </header>
+      <div class="player">
+        <div class="stage"><video id="vid" preload="auto"></video><div class="big-play" id="bigPlay"></div></div>
+        <div class="controls">
+          <button class="btn icon" id="pp" title="Play / pause (Space)"></button>
+          <span class="readout tc" id="tc">0:00.0 / 0:00.0</span>
+          <span class="grow"></span>
+          <label class="field">Sound <select id="track"></select></label>
+          <label class="field">Speed <select id="rate"><option>0.25</option><option>0.5</option><option selected>1</option><option>1.5</option><option>2</option></select></label>
+          <input type="range" id="vol" min="0" max="1" step="0.01" value="1" title="Volume">
+        </div>
+        <div class="timeline" id="tl">
+          <div class="film" id="film"></div>
+          <div class="shade l" id="shadeL"></div><div class="shade r" id="shadeR"></div>
+          <div class="sel" id="selBox"></div>
+          <div class="handle in" id="hIn" title="Drag to set the start ( I )"><i></i></div>
+          <div class="handle out" id="hOut" title="Drag to set the end ( O )"><i></i></div>
+          <div class="head" id="playhead"></div>
+        </div>
+        <div class="trimrow">
+          <div class="trim-tx readout"><span>Start <b id="tIn">0:00.0</b></span><span>End <b id="tOut">0:00.0</b></span><span>Length <b id="tLen">0:00.0</b></span></div>
+          <button class="btn quiet" id="setIn">Start here <span class="key">I</span></button>
+          <button class="btn quiet" id="setOut">End here <span class="key">O</span></button>
+          <button class="btn quiet" id="resetTrim">Reset</button>
+        </div>
+        <div class="export">
+          <div class="exp-l">
+            <h3>Export</h3>
+            <div class="seg" id="expKind">
+              <button data-v="copy" class="on" title="Cuts on the nearest frame that starts a group, keeps full quality, instant">Fast trim</button>
+              <button data-v="exact" title="Re-encodes for frame-exact cuts">Exact trim</button>
+              <button data-v="small" title="Shrinks the clip to fit a size limit">Small file</button>
+              <button data-v="gif">GIF</button>
+            </div>
+            <select id="expSize" hidden><option value="10">Under 10 MB (Discord)</option><option value="25">Under 25 MB</option><option value="50">Under 50 MB (Discord Nitro Basic)</option><option value="100">Under 100 MB</option><option value="500">Under 500 MB</option></select>
+            <select id="expTrack"></select>
+          </div>
+          <div class="exp-r">
+            <span class="progress" id="expProg" hidden><i id="expBar"></i></span>
+            <button class="btn" id="pCopy"></button>
+            <button class="btn" id="pUpload"></button>
+            <button class="btn primary" id="expGo">Export</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= instant replay ================= -->
+    <section class="page" id="page-replay" hidden>
+      <div class="wrap">
+        <h1>Instant replay</h1>
+        <p class="lead">Glimpse records in the background and keeps only the last few minutes. Press the save key after something good happens and those moments become a clip. Nothing is kept until you save.</p>
+
+        <div class="hero">
+          <div class="hero-l">
+            <div class="hero-state"><span class="dot" id="heroDot"></span><b id="heroTitle">Off</b></div>
+            <div class="hero-sub" id="heroSub">Turn it on to start keeping the last moments.</div>
+            <div class="hero-err" id="heroErr" hidden></div>
+          </div>
+          <div class="hero-stats readout" id="heroStats"></div>
+          <label class="sw big"><input type="checkbox" id="heroToggle"><span></span></label>
+        </div>
+
+        <h2>How much to keep</h2>
+        <div class="rows">
+          <div class="r col">
+            <div class="l"><div>Replay length</div><small>Saving a clip takes this many seconds back from the moment you press the key</small></div>
+            <div class="lenpick">
+              <div class="seg wide" id="lenPresets"></div>
+              <div class="lenline"><input type="range" id="length" min="10" max="1200" step="5"><b class="readout" id="lengthV"></b></div>
+            </div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Short clip length</div><small>For the second save key, when you only want the last few seconds</small></div>
+            <select id="shortLength"><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="20">20 seconds</option><option value="30">30 seconds</option><option value="45">45 seconds</option><option value="60">1 minute</option></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Disk space while running</div><small>Kept in a temporary folder and wiped when it turns off</small></div>
+            <b class="readout" id="diskNeed"></b>
+          </div>
+        </div>
+
+        <h2>Keys</h2>
+        <div class="rows" id="hotkeys"></div>
+        <div class="warn" id="hkWarn" hidden></div>
+        <p class="hint">Keys work inside games too. If a key does nothing, another app (for example the NVIDIA or Xbox overlay) may already use it: pick different keys here or turn that overlay off.</p>
+
+        <h2>When to run</h2>
+        <div class="rows">
+          <div class="r col">
+            <div class="seg wide" id="startMode">
+              <button data-v="remember">Like last time</button><button data-v="always">Always</button><button data-v="apps">With my games</button><button data-v="manual">Only when I turn it on</button>
+            </div>
+            <small class="sub" id="startModeSub"></small>
+          </div>
+          <div class="r col" id="startAppsRow" hidden>
+            <div class="l"><div>Games and apps</div><small>Instant replay turns on while any of these is running, and off 30 seconds after they close</small></div>
+            <div class="applist" id="startApps"></div>
+            <button class="btn" id="addStartApp">Add a game or app</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= video ================= -->
+    <section class="page" id="page-video" hidden>
+      <div class="wrap">
+        <h1>Video</h1>
+        <p class="lead" id="vidSummary"></p>
+
+        <h2>What to record</h2>
+        <div class="rows">
+          <div class="r col">
+            <div class="seg wide" id="vTarget"><button data-v="screen">A whole screen</button><button data-v="window">One app's window</button></div>
+          </div>
+          <div class="r" id="vDisplayRow">
+            <div class="l"><div>Screen</div><small>“Where the mouse is” picks it each time replay starts</small></div>
+            <select id="vDisplay"></select>
+          </div>
+          <div class="r col" id="vWindowRow" hidden>
+            <div class="l"><div>App</div><small>Only this window is recorded, wherever it is. Fullscreen games fill the whole screen. If the app isn't open, the screen is recorded until it is.</small></div>
+            <div class="pickrow"><select id="vWindow"></select><button class="btn quiet" id="vWindowRefresh">Refresh</button></div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Show the mouse pointer</div></div>
+            <label class="sw"><input type="checkbox" id="vCursor"><span></span></label>
+          </div>
+        </div>
+
+        <h2>Quality</h2>
+        <div class="rows">
+          <div class="r col">
+            <div class="l"><div>Quality</div><small id="qualSub"></small></div>
+            <div class="seg wide" id="vQuality"><button data-v="low">Low</button><button data-v="medium">Medium</button><button data-v="high">High</button><button data-v="ultra">Ultra</button><button data-v="custom">Custom</button></div>
+          </div>
+          <div class="r" id="vMbpsRow" hidden>
+            <div class="l"><div>Bitrate</div><small>Megabits per second. 20 to 50 is plenty for 1080p at 60 fps</small></div>
+            <div class="slide"><input type="range" id="vMbps" min="2" max="150" step="1"><b class="readout" id="vMbpsV"></b></div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Resolution</div><small>Lower than your screen makes smaller files, the picture is scaled down</small></div>
+            <select id="vRes"><option value="native">Same as the screen</option><option value="2160">2160p (4K)</option><option value="1440">1440p</option><option value="1080">1080p</option><option value="900">900p</option><option value="720">720p</option><option value="480">480p</option></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Frame rate</div><small>60 is smooth for most games. Higher only helps on high refresh screens</small></div>
+            <div class="seg" id="vFps"><button data-v="30">30</button><button data-v="60">60</button><button data-v="120">120</button><button data-v="144">144</button><button data-v="165">165</button><button data-v="240">240</button></div>
+          </div>
+        </div>
+
+        <h2>Encoder <span class="adv">Advanced</span></h2>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Format</div><small id="codecSub">H.264 plays everywhere, including Discord. HEVC is the same quality at about 30% smaller, but some apps can't play it</small></div>
+            <div class="seg" id="vCodec"><button data-v="h264">H.264</button><button data-v="hevc">HEVC</button><button data-v="av1">AV1</button></div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Encoder</div><small>Graphics card encoders cost your game almost nothing. The CPU one slows games down</small></div>
+            <select id="vEncoder"></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Bitrate mode</div><small id="rcSub"></small></div>
+            <div class="seg" id="vRc"><button data-v="vbr">Variable</button><button data-v="cbr">Constant</button><button data-v="cq">Constant quality</button></div>
+          </div>
+          <div class="r" id="vCqRow" hidden>
+            <div class="l"><div>Quality level</div><small>Lower is better and bigger. 18 looks near perfect, 28 is noticeably soft</small></div>
+            <div class="slide"><input type="range" id="vCq" min="14" max="36" step="1"><b class="readout" id="vCqV"></b></div>
+          </div>
+          <div class="r" id="vPresetRow">
+            <div class="l"><div>Encoder speed</div><small>Slower presets look a little better and use more of the graphics card</small></div>
+            <select id="vPreset"><option value="p1">Fastest</option><option value="p2">Faster</option><option value="p3">Fast</option><option value="p4">Balanced</option><option value="p5">Slow</option><option value="p6">Slower</option><option value="p7">Slowest, best</option></select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= audio ================= -->
+    <section class="page" id="page-audio" hidden>
+      <div class="wrap">
+        <h1>Audio</h1>
+        <p class="lead">Choose which sounds end up in your clips. The bars move with what is being picked up right now.</p>
+
+        <div class="meters" id="meters"></div>
+
+        <h2>Game and app sound</h2>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Record sound from my PC</div><small>What you hear: the game, music, voice chat</small></div>
+            <label class="sw"><input type="checkbox" id="aSystem"><span></span></label>
+          </div>
+          <div class="r col" id="aWhichRow">
+            <div class="l"><div>Which sounds</div><small id="aWhichSub"></small></div>
+            <div class="seg wide" id="aMode"><button data-v="all">Everything I hear</button><button data-v="only">Only these apps</button><button data-v="except">Everything except one app</button></div>
+          </div>
+          <div class="r col" id="aAppsRow" hidden>
+            <div class="applist" id="aApps"></div>
+            <button class="btn" id="aAddApp">Add an app</button>
+          </div>
+          <div class="r" id="aExceptRow" hidden>
+            <div class="l"><div>Leave out</div><small>For example Discord, so friends' voices stay out of your clips</small></div>
+            <select id="aExcept"></select>
+          </div>
+          <div class="r" id="aDeviceRow">
+            <div class="l"><div>Speakers or headset</div><small>The output to record from</small></div>
+            <select id="aDevice"></select>
+          </div>
+          <div class="r" id="aVolRow">
+            <div class="l"><div>Volume in clips</div></div>
+            <div class="slide"><input type="range" id="aVol" min="0" max="200" step="5"><b class="readout" id="aVolV"></b></div>
+          </div>
+        </div>
+
+        <h2>Microphone</h2>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Record my microphone</div></div>
+            <label class="sw"><input type="checkbox" id="mOn"><span></span></label>
+          </div>
+          <div class="r" data-mic>
+            <div class="l"><div>Microphone</div></div>
+            <select id="mDevice"></select>
+          </div>
+          <div class="r" data-mic>
+            <div class="l"><div>Volume in clips</div></div>
+            <div class="slide"><input type="range" id="mVol" min="0" max="300" step="5"><b class="readout" id="mVolV"></b></div>
+          </div>
+          <div class="r col" data-mic>
+            <div class="l"><div>When to record it</div></div>
+            <div class="seg wide" id="mMode"><button data-v="always">Always</button><button data-v="ptt">Only while I hold a key</button></div>
+          </div>
+          <div class="r" data-mic id="mPttRow" hidden>
+            <div class="l"><div>Push-to-talk key</div><small>Any key or the side mouse buttons. It still works in the game as normal</small></div>
+            <button class="hk" id="mPtt"></button>
+          </div>
+          <div class="r" data-mic>
+            <div class="l"><div>Noise suppression</div><small>Takes out fans, hum and keyboard noise</small></div>
+            <label class="sw"><input type="checkbox" id="mDenoise"><span></span></label>
+          </div>
+          <div class="r" data-mic>
+            <div class="l"><div>Noise gate</div><small>Silences the mic when you are not talking</small></div>
+            <label class="sw"><input type="checkbox" id="mGate"><span></span></label>
+          </div>
+          <div class="r" data-mic id="mGateRow" hidden>
+            <div class="l"><div>Gate opens above</div><small>Raise it if background sound gets through, lower it if words get cut</small></div>
+            <div class="slide"><input type="range" id="mGateDb" min="-70" max="-15" step="1"><b class="readout" id="mGateDbV"></b></div>
+          </div>
+        </div>
+
+        <h2>Tracks and quality <span class="adv">Advanced</span></h2>
+        <div class="rows">
+          <div class="r col">
+            <div class="l"><div>Audio tracks</div><small>Separate tracks let you turn your mic or the game up or down later in a video editor</small></div>
+            <div class="seg wide" id="aTracks"><button data-v="separate">Mix plus separate game and mic</button><button data-v="mixed">One mixed track</button></div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Audio quality</div></div>
+            <select id="aKbps"><option value="128">128 kbps</option><option value="160">160 kbps</option><option value="192">192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select>
+          </div>
+          <div class="r">
+            <div class="l"><div>Sound delay</div><small>If the sound in your clips is early or late compared to the picture, move it here</small></div>
+            <div class="slide"><input type="range" id="aOffset" min="-500" max="500" step="10"><b class="readout" id="aOffsetV"></b></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= saving ================= -->
+    <section class="page" id="page-saving" hidden>
+      <div class="wrap">
+        <h1>Saving</h1>
+        <div class="rows">
+          <div class="r">
+            <div class="l"><div>Clips folder</div><small class="path" id="folder"></small></div>
+            <button class="btn" id="pickFolder">Change</button>
+          </div>
+          <div class="r">
+            <div class="l"><div>A folder for each game</div><small>Clips go into Clips\VALORANT, Clips\Minecraft and so on, named after the app in front</small></div>
+            <label class="sw"><input type="checkbox" id="perApp"><span></span></label>
+          </div>
+          <div class="r">
+            <div class="l"><div>File type</div><small>MP4 opens everywhere. MKV survives a crash mid-save</small></div>
+            <div class="seg" id="container"><button data-v="mp4">MP4</button><button data-v="mkv">MKV</button></div>
+          </div>
+          <div class="r">
+            <div class="l"><div>Show a message when a clip is saved</div></div>
+            <label class="sw"><input type="checkbox" id="notify"><span></span></label>
+          </div>
+          <div class="r">
+            <div class="l"><div>Play a sound when a clip is saved</div><small>A short soft chime</small></div>
+            <label class="sw"><input type="checkbox" id="sound"><span></span></label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="appModal" hidden>
+    <div class="box">
+      <header><b id="appModalTitle">Add an app</b><button class="btn icon quiet" id="appModalClose"></button></header>
+      <div class="search"><span id="srchIc2"></span><input type="text" id="appQ" placeholder="Search running apps, or type a file name like game.exe" spellcheck="false"></div>
+      <div class="applist pick" id="appPick"></div>
+      <footer><small>Apps making sound right now are marked. Open the game first if it isn't listed.</small><button class="btn" id="appAddTyped" hidden>Add</button></footer>
+    </div>
+  </div>
+
+  <script src="icons.js"></script>
+  <script src="clips.js"></script>
+</body>
+</html>

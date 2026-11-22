@@ -19,7 +19,13 @@ const DEFAULTS = {
     fullscreen: 'Ctrl+Alt+PrintScreen',
     gif: 'Ctrl+PrintScreen',
     video: 'Ctrl+Shift+PrintScreen',
+    clipSave: 'Alt+Z',
+    clipShort: '',
+    clipToggle: 'Alt+Shift+Z',
+    recordToggle: 'Alt+F9',
+    micMute: '',
   },
+  clips: {},
 };
 
 const userFile = (name) => path.join(app.getPath('userData'), name);
